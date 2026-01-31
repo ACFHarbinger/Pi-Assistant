@@ -77,6 +77,26 @@ class InferenceEngine:
         embedding = self._embedding_model.encode(text, convert_to_numpy=True)
         return embedding.tolist()
 
+    def _load_secrets(self) -> dict[str, str]:
+        """Load secrets from ~/.pi-assistant/secrets.json."""
+        import json
+        secrets_path = Path.home() / ".pi-assistant" / "secrets.json"
+        if secrets_path.exists():
+            try:
+                with open(secrets_path, "r") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {}
+
+    def _save_secrets(self, secrets: dict[str, str]) -> None:
+        """Save secrets to ~/.pi-assistant/secrets.json."""
+        import json
+        secrets_path = Path.home() / ".pi-assistant" / "secrets.json"
+        secrets_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(secrets_path, "w") as f:
+            json.dump(secrets, f, indent=2)
+
     async def complete(
         self,
         prompt: str,
@@ -97,7 +117,34 @@ class InferenceEngine:
             A dictionary containing the text completion.
         """
         if provider == "anthropic":
-            return await self._complete_anthropic(prompt, model_id, max_tokens, temperature)
+            secrets = self._load_secrets()
+            has_claude_max = bool(secrets.get("claude_max_oauth"))
+            has_antigravity_tokens = bool(
+                secrets.get("anthropic_oauth") or secrets.get("antigravity_oauth")
+            )
+
+            if has_claude_max:
+                try:
+                    return await self._complete_claude_max(
+                        prompt, model_id, max_tokens, temperature
+                    )
+                except Exception as e:
+                    logger.warning("Claude Max direct API failed: %s", e)
+                    if has_antigravity_tokens:
+                        logger.info("Falling back to Antigravity Gateway")
+                        model = model_id or "claude-3-5-sonnet-v2@20241022"
+                        return await self._complete_gemini(
+                            prompt, model, max_tokens, temperature
+                        )
+                    raise
+            elif has_antigravity_tokens:
+                logger.info("Routing Anthropic request via Antigravity Gateway")
+                model = model_id or "claude-3-5-sonnet-v2@20241022"
+                return await self._complete_gemini(prompt, model, max_tokens, temperature)
+            else:
+                return await self._complete_anthropic(
+                    prompt, model_id, max_tokens, temperature
+                )
         elif provider == "google":
             return await self._complete_gemini(prompt, model_id, max_tokens, temperature)
         else:
@@ -187,38 +234,36 @@ Available tools: shell, code, browser"""
         self, prompt: str, model_id: str | None, max_tokens: int, temperature: float
     ) -> dict[str, Any]:
         """
-        Complete using Anthropic Claude.
-        Args:
-            prompt: The prompt to use for text completion.
-            model_id: The model ID to use for text completion.
-            max_tokens: The maximum number of tokens to generate.
-            temperature: The temperature to use for text completion.
-        Returns:
-            A dictionary containing the text completion.
+        Complete using Anthropic Claude via standard SDK (API Key).
+        Note: OAuth traffic is routed via _complete_gemini.
         """
+        import os
+        
+        # If we got here, we are using standard API Key
         if self._anthropic_client is None:
             import anthropic
-
+            
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
-                # Try loading from secrets.json
-                secrets_path = Path.home() / ".pi-assistant" / "secrets.json"
-                if secrets_path.exists():
-                    import json
+                 from pathlib import Path
+                 import json
+                 secrets_path = Path.home() / ".pi-assistant" / "secrets.json"
+                 if secrets_path.exists():
                     try:
                         with open(secrets_path, "r") as f:
                             secrets = json.load(f)
-                            api_key = secrets.get("anthropic") or secrets.get("anthropic_oauth")
-                    except Exception as e:
-                        logger.error("Failed to load secrets: %s", e)
-
+                            api_key = secrets.get("anthropic")
+                    except:
+                        pass
+            
             if not api_key:
-                raise ValueError("ANTHROPIC_API_KEY environment variable not set and no secret found")
+                raise ValueError("ANTHROPIC_API_KEY not set")
+                
             self._anthropic_client = anthropic.AsyncAnthropic(api_key=api_key)
 
-        model = model_id or "claude-sonnet-4-20250514"
-        logger.info("Calling Anthropic: %s", model)
-
+        model = model_id or "claude-3-5-sonnet-latest"
+        logger.info("Calling Anthropic SDK: %s", model)
+        
         response = await self._anthropic_client.messages.create(
             model=model,
             max_tokens=max_tokens,
@@ -234,6 +279,137 @@ Available tools: shell, code, browser"""
                 "output_tokens": response.usage.output_tokens,
             },
         }
+
+    async def _refresh_claude_max_token(self) -> str:
+        """Refresh Claude Max OAuth token and return new access token."""
+        import httpx
+        secrets = self._load_secrets()
+        refresh_token = secrets.get("claude_max_refresh")
+        if not refresh_token:
+            raise ValueError("No Claude Max refresh token available")
+
+        async with httpx.AsyncClient(trust_env=False) as client:
+            response = await client.post(
+                "https://console.anthropic.com/v1/oauth/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+                },
+                timeout=30.0,
+            )
+
+            if response.status_code != 200:
+                raise ValueError(
+                    f"Token refresh failed ({response.status_code}): {response.text}"
+                )
+
+            data = response.json()
+            new_token = data["access_token"]
+
+            # Update secrets
+            secrets["claude_max_oauth"] = new_token
+            if "refresh_token" in data:
+                secrets["claude_max_refresh"] = data["refresh_token"]
+            if "expires_in" in data:
+                import time
+                secrets["claude_max_expires_at"] = str(
+                    int(time.time()) + data["expires_in"]
+                )
+            self._save_secrets(secrets)
+
+            logger.info("Claude Max token refreshed successfully")
+            return new_token
+
+    async def _complete_claude_max(
+        self, prompt: str, model_id: str | None, max_tokens: int, temperature: float
+    ) -> dict[str, Any]:
+        """
+        Complete using Claude Pro/Max subscription via direct Anthropic API with OAuth token.
+        """
+        import httpx
+        import time
+
+        secrets = self._load_secrets()
+        access_token = secrets.get("claude_max_oauth")
+        if not access_token:
+            raise ValueError("No Claude Max OAuth token found")
+
+        # Check expiry and refresh if needed
+        expires_at = secrets.get("claude_max_expires_at")
+        if expires_at:
+            try:
+                if int(expires_at) < int(time.time()) + 60:
+                    logger.info("Claude Max token expired, refreshing...")
+                    access_token = await self._refresh_claude_max_token()
+            except (ValueError, TypeError):
+                pass
+
+        model = model_id or "claude-sonnet-4-5-20250514"
+        logger.info("Calling Claude Max API directly: %s", model)
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+            "anthropic-beta": "oauth-2025-04-20",
+        }
+
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+
+        async with httpx.AsyncClient(trust_env=False) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                json=payload,
+                headers=headers,
+                timeout=120.0,
+            )
+
+            if response.status_code == 401:
+                # Token might be expired, try refresh
+                logger.info("Got 401, attempting token refresh...")
+                access_token = await self._refresh_claude_max_token()
+                headers["Authorization"] = f"Bearer {access_token}"
+                response = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    json=payload,
+                    headers=headers,
+                    timeout=120.0,
+                )
+
+            if response.status_code != 200:
+                error_text = response.text
+                logger.error(
+                    "Claude Max API error %d: %s", response.status_code, error_text
+                )
+                raise ValueError(
+                    f"Claude Max API error ({response.status_code}): {error_text}"
+                )
+
+            data = response.json()
+
+            # Parse Anthropic Messages API response
+            content_blocks = data.get("content", [])
+            text = "".join(
+                block.get("text", "")
+                for block in content_blocks
+                if block.get("type") == "text"
+            )
+
+            usage = data.get("usage", {})
+            return {
+                "text": text,
+                "provider": "anthropic",
+                "model": model,
+                "usage": {
+                    "input_tokens": usage.get("input_tokens", 0),
+                    "output_tokens": usage.get("output_tokens", 0),
+                },
+            }
 
     async def _complete_gemini(
         self, prompt: str, model_id: str | None, max_tokens: int, temperature: float
@@ -256,7 +432,8 @@ Available tools: shell, code, browser"""
                     with open(secrets_path, "r") as f:
                         secrets = json.load(f)
                         api_key = (
-                            secrets.get("antigravity_oauth")
+                            secrets.get("anthropic_oauth")
+                            or secrets.get("antigravity_oauth")
                             or secrets.get("google_oauth")
                             or secrets.get("gemini_oauth")
                             or secrets.get("google")

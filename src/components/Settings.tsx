@@ -92,14 +92,71 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
         }
     }
 
+    // Auth connection state
+    const [claudeConnected, setClaudeConnected] = useState(false);
+    const [claudeLoading, setClaudeLoading] = useState(false);
+    const [antigravityConnected, setAntigravityConnected] = useState(false);
+    const [antigravityLoading, setAntigravityLoading] = useState(false);
+    const [geminiConnected, setGeminiConnected] = useState(false);
+    const [geminiLoading, setGeminiLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && activeTab === 'auth') {
+            invoke('check_claude_auth').then((connected: any) => setClaudeConnected(connected));
+            invoke('check_provider_auth', { provider: 'antigravity' }).then((connected: any) => setAntigravityConnected(connected));
+            invoke('check_provider_auth', { provider: 'gemini' }).then((connected: any) => setGeminiConnected(connected));
+        }
+    }, [isOpen, activeTab]);
+
+    async function handleClaudeLogin() {
+        setClaudeLoading(true);
+        try {
+            await invoke('start_claude_oauth');
+            setClaudeConnected(true);
+            alert('Claude Pro/Max connected successfully!');
+        } catch (e) {
+            console.error(e);
+            alert(`Claude login failed: ${e}`);
+        } finally {
+            setClaudeLoading(false);
+        }
+    }
+
+    async function handleClaudeDisconnect() {
+        try {
+            await invoke('disconnect_claude_auth');
+            setClaudeConnected(false);
+        } catch (e) {
+            console.error(e);
+            alert(`Disconnect failed: ${e}`);
+        }
+    }
+
     async function handleLogin(provider: string) {
+        const setLoading = provider === 'antigravity' ? setAntigravityLoading : setGeminiLoading;
+        const setConnected = provider === 'antigravity' ? setAntigravityConnected : setGeminiConnected;
+        setLoading(true);
         try {
             const code = await invoke('start_oauth', { provider, clientId: '' });
             await invoke('exchange_oauth_code', { provider, code, clientId: '', clientSecret: '', redirectUri: '' });
+            setConnected(true);
             alert(`Login to ${provider} successful!`);
         } catch (e) {
             console.error(e);
             alert(`Login failed: ${e}`);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function handleProviderDisconnect(provider: string) {
+        const setConnected = provider === 'antigravity' ? setAntigravityConnected : setGeminiConnected;
+        try {
+            await invoke('disconnect_provider_auth', { provider });
+            setConnected(false);
+        } catch (e) {
+            console.error(e);
+            alert(`Disconnect failed: ${e}`);
         }
     }
 
@@ -309,26 +366,59 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                         <div className="space-y-6">
                             <h3 className="font-bold dark:text-white">Authentication Providers</h3>
                             <div className="grid gap-4">
-                                <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded flex justify-between items-center">
-                                    <div>
-                                        <div className="font-bold dark:text-white">Google Antigravity</div>
-                                        <div className="text-sm text-zinc-500">Official Cloud Code Assist (Internal)</div>
+                                <div className={`p-4 rounded border-2 ${claudeConnected ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800'}`}>
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <div className="font-bold dark:text-white">Claude Pro/Max</div>
+                                            <div className="text-sm text-zinc-500">Use your Claude subscription for inference</div>
+                                            {claudeConnected && <div className="text-xs text-green-600 dark:text-green-400 mt-1">Connected</div>}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {claudeConnected ? (
+                                                <button onClick={handleClaudeDisconnect} className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-4 py-2 rounded hover:bg-red-200 dark:hover:bg-red-900/50 text-sm">Disconnect</button>
+                                            ) : (
+                                                <button onClick={handleClaudeLogin} disabled={claudeLoading} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50">
+                                                    {claudeLoading ? 'Connecting...' : 'Login'}
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                    <button onClick={() => handleLogin('antigravity')} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Login</button>
                                 </div>
-                                <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded flex justify-between items-center">
-                                    <div>
-                                        <div className="font-bold dark:text-white">Google Gemini</div>
-                                        <div className="text-sm text-zinc-500">Standard Generative Language API</div>
+                                <div className={`p-4 rounded border-2 ${antigravityConnected ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800'}`}>
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <div className="font-bold dark:text-white">Google Antigravity</div>
+                                            <div className="text-sm text-zinc-500">Cloud Code Assist (Internal)</div>
+                                            {antigravityConnected && <div className="text-xs text-green-600 dark:text-green-400 mt-1">Connected</div>}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {antigravityConnected ? (
+                                                <button onClick={() => handleProviderDisconnect('antigravity')} className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-4 py-2 rounded hover:bg-red-200 dark:hover:bg-red-900/50 text-sm">Disconnect</button>
+                                            ) : (
+                                                <button onClick={() => handleLogin('antigravity')} disabled={antigravityLoading} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50">
+                                                    {antigravityLoading ? 'Connecting...' : 'Login'}
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                    <button onClick={() => handleLogin('gemini')} className="bg-zinc-200 dark:bg-zinc-700 dark:text-white px-4 py-2 rounded hover:bg-zinc-300 dark:hover:bg-zinc-600">Login</button>
                                 </div>
-                                <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded flex justify-between items-center">
-                                    <div>
-                                        <div className="font-bold dark:text-white">Anthropic</div>
-                                        <div className="text-sm text-zinc-500">Claude API</div>
+                                <div className={`p-4 rounded border-2 ${geminiConnected ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800'}`}>
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <div className="font-bold dark:text-white">Google Gemini</div>
+                                            <div className="text-sm text-zinc-500">Standard Generative Language API</div>
+                                            {geminiConnected && <div className="text-xs text-green-600 dark:text-green-400 mt-1">Connected</div>}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {geminiConnected ? (
+                                                <button onClick={() => handleProviderDisconnect('gemini')} className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-4 py-2 rounded hover:bg-red-200 dark:hover:bg-red-900/50 text-sm">Disconnect</button>
+                                            ) : (
+                                                <button onClick={() => handleLogin('gemini')} disabled={geminiLoading} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50">
+                                                    {geminiLoading ? 'Connecting...' : 'Login'}
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                    <button onClick={() => handleLogin('anthropic')} className="bg-zinc-200 dark:bg-zinc-700 dark:text-white px-4 py-2 rounded hover:bg-zinc-300 dark:hover:bg-zinc-600">Login</button>
                                 </div>
                             </div>
                         </div>

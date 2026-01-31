@@ -88,6 +88,12 @@ pub fn run() {
             commands::config::save_current_model,
             commands::auth::start_oauth,
             commands::auth::exchange_oauth_code,
+            commands::auth::start_claude_oauth,
+            commands::auth::refresh_claude_token,
+            commands::auth::check_claude_auth,
+            commands::auth::disconnect_claude_auth,
+            commands::auth::check_provider_auth,
+            commands::auth::disconnect_provider_auth,
             commands::sidecar::sidecar_request,
         ])
         .run(tauri::generate_context!())
