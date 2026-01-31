@@ -13,6 +13,7 @@ pub mod memory;
 pub mod safety;
 pub mod state;
 pub mod tools;
+pub mod voice;
 pub mod ws;
 
 /// Initialize and run the Tauri application.
@@ -102,6 +103,8 @@ pub fn run() {
             commands::cron::get_cron_jobs,
             commands::cron::add_cron_job,
             commands::cron::remove_cron_job,
+            commands::voice::start_voice_listener,
+            commands::voice::stop_voice_listener,
             commands::auth::start_oauth,
             commands::auth::exchange_oauth_code,
             commands::auth::start_claude_oauth,

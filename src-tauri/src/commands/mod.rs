@@ -6,3 +6,4 @@ pub mod chat;
 pub mod config;
 pub mod cron;
 pub mod sidecar;
+pub mod voice;

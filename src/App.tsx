@@ -4,6 +4,7 @@ import { ChatInterface } from "./components/ChatInterface.tsx";
 import { TaskInput } from "./components/TaskInput.tsx";
 import { PermissionDialog } from "./components/PermissionDialog.tsx";
 import { HatchingExperience } from "./components/HatchingExperience.tsx";
+import { VoicePanel } from "./components/VoicePanel";
 
 import Settings from "./components/Settings";
 import { useState, useEffect } from "react";
@@ -112,6 +113,9 @@ function App() {
 
             {/* Permission Dialog */}
             <PermissionDialog />
+
+            {/* Voice Control Panel */}
+            <VoicePanel />
 
             {/* Settings Dialog */}
             <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />

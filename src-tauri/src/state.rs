@@ -22,6 +22,7 @@ pub struct AppState {
     pub sidecar: Arc<Mutex<SidecarHandle>>,
     pub channel_manager: Arc<ChannelManager>,
     pub cron_manager: Arc<CronManager>,
+    pub voice_manager: Arc<Mutex<crate::voice::VoiceManager>>,
 }
 
 impl AppState {
@@ -47,6 +48,13 @@ impl AppState {
             tracing::warn!("Failed to load MCP tools: {}", e);
         }
 
+        let mut voice_manager = crate::voice::VoiceManager::new(agent_cmd_tx.clone());
+        let model_path = config_dir.join("voice").join("vosk-model-small-en-us-0.15");
+        if let Err(e) = voice_manager.init_detector(model_path, 16000.0).await {
+            tracing::warn!("Failed to initialize voice detector: {}", e);
+        }
+        let voice_manager_arc = Arc::new(Mutex::new(voice_manager));
+
         Self {
             agent_state_tx,
             agent_state_rx,
@@ -58,6 +66,7 @@ impl AppState {
             sidecar,
             channel_manager: Arc::new(ChannelManager::new()),
             cron_manager: cron_manager_arc,
+            voice_manager: voice_manager_arc,
         }
     }
 }

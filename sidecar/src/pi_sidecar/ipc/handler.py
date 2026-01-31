@@ -52,6 +52,8 @@ class RequestHandler:
             "training.stop": self._training_stop,
             "training.status": self._training_status,
             "training.list": self._training_list,
+            "voice.synthesize": self._voice_synthesize,
+            "voice.transcribe": self._voice_transcribe,
         }
 
     async def dispatch(
@@ -295,3 +297,33 @@ class RequestHandler:
         """
         runs = await self.training.list_runs()
         return {"runs": runs}
+
+    async def _voice_synthesize(self, params, _cb):
+        """
+        Handle TTS synthesis requests.
+        """
+        text = params.get("text")
+        output_path = params.get("output_path")
+        if not text or not output_path:
+            raise ValueError("Missing text or output_path")
+            
+        from pi_sidecar.tts.elevenlabs import ElevenLabsTTS
+        tts = ElevenLabsTTS(api_key=params.get("api_key"))
+        success = await tts.synthesize(text, output_path)
+        return {"success": success, "output_path": output_path}
+
+    async def _voice_transcribe(self, params, _cb):
+        """
+        Handle STT transcription requests.
+        """
+        audio_path = params.get("audio_path")
+        if not audio_path:
+            raise ValueError("Missing audio_path")
+            
+        from pi_sidecar.stt.whisper import WhisperSTT
+        stt = WhisperSTT(
+            model_size=params.get("model_size", "base"),
+            device=params.get("device", "cpu")
+        )
+        text = await stt.transcribe(audio_path)
+        return {"text": text, "audio_path": audio_path}
