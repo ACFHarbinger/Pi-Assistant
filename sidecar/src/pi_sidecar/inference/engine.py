@@ -21,13 +21,25 @@ class InferenceEngine:
     """Multi-provider inference engine."""
 
     def __init__(self, registry: ModelRegistry):
+        """
+        Initialize the inference engine.
+        Args:
+            registry: The model registry to use for text completion.
+        """
         self.registry = registry
         self._embedding_model = None
         self._anthropic_client = None
         self._gemini_client = None
 
     async def embed(self, text: str, model_id: str = "all-MiniLM-L6-v2") -> list[float]:
-        """Generate embeddings using sentence-transformers."""
+        """
+        Generate embeddings using sentence-transformers.
+        Args:
+            text: The text to generate embeddings for.
+            model_id: The model ID to use for text completion.
+        Returns:
+            A list of floats containing the embeddings.
+        """
         if self._embedding_model is None:
             from sentence_transformers import SentenceTransformer
 
@@ -45,7 +57,17 @@ class InferenceEngine:
         max_tokens: int = 1024,
         temperature: float = 0.7,
     ) -> dict[str, Any]:
-        """Generate text completion from specified provider."""
+        """
+        Generate text completion from specified provider.
+        Args:
+            prompt: The prompt to use for text completion.
+            provider: The provider to use for text completion.
+            model_id: The model ID to use for text completion.
+            max_tokens: The maximum number of tokens to generate.
+            temperature: The temperature to use for text completion.
+        Returns:
+            A dictionary containing the text completion.
+        """
         if provider == "anthropic":
             return await self._complete_anthropic(prompt, model_id, max_tokens, temperature)
         elif provider == "gemini":
@@ -60,33 +82,42 @@ class InferenceEngine:
         context: list[dict],
         provider: str = "local",
     ) -> dict[str, Any]:
-        """Generate agent plan using structured output."""
+        """
+        Generate agent plan using structured output.
+        Args:
+            task: The task to generate a plan for.
+            iteration: The iteration number.
+            context: The context to use for text completion.
+            provider: The provider to use for text completion.
+        Returns:
+            A dictionary containing the agent plan.
+        """
         system_prompt = """You are an AI agent planner. Given a task and context, decide:
-1. What tools to call (if any)
-2. Whether to ask the user a question
-3. Whether the task is complete
+            1. What tools to call (if any)
+            2. Whether to ask the user a question
+            3. Whether the task is complete
 
-Respond with JSON:
-{
-  "reasoning": "your chain of thought",
-  "tool_calls": [{"tool_name": "...", "parameters": {...}}],
-  "question": "optional question for user",
-  "is_complete": false
-}
+            Respond with JSON:
+            {
+                "reasoning": "your chain of thought",
+                "tool_calls": [{"tool_name": "...", "parameters": {...}}],
+                "question": "optional question for user",
+                "is_complete": false
+            }
 
-Available tools: shell, code, browser"""
+            Available tools: shell, code, browser"""
 
         context_str = "\n".join(
             f"[{c.get('role', 'system')}]: {c.get('content', '')}" for c in context
         )
 
         prompt = f"""Task: {task}
-Iteration: {iteration}
+            Iteration: {iteration}
 
-Context:
-{context_str}
+            Context:
+            {context_str}
 
-What should I do next?"""
+            What should I do next?"""
 
         result = await self.complete(
             prompt=f"{system_prompt}\n\n{prompt}",
@@ -119,7 +150,16 @@ What should I do next?"""
     async def _complete_anthropic(
         self, prompt: str, model_id: str | None, max_tokens: int, temperature: float
     ) -> dict[str, Any]:
-        """Complete using Anthropic Claude."""
+        """
+        Complete using Anthropic Claude.
+        Args:
+            prompt: The prompt to use for text completion.
+            model_id: The model ID to use for text completion.
+            max_tokens: The maximum number of tokens to generate.
+            temperature: The temperature to use for text completion.
+        Returns:
+            A dictionary containing the text completion.
+        """
         if self._anthropic_client is None:
             import anthropic
 
@@ -150,7 +190,16 @@ What should I do next?"""
     async def _complete_gemini(
         self, prompt: str, model_id: str | None, max_tokens: int, temperature: float
     ) -> dict[str, Any]:
-        """Complete using Google Gemini with OAuth."""
+        """
+        Complete using Google Gemini with OAuth.
+        Args:
+            prompt: The prompt to use for text completion.
+            model_id: The model ID to use for text completion.
+            max_tokens: The maximum number of tokens to generate.
+            temperature: The temperature to use for text completion.
+        Returns:
+            A dictionary containing the text completion.
+        """
         if self._gemini_client is None:
             import google.generativeai as genai
 
@@ -184,7 +233,16 @@ What should I do next?"""
     async def _complete_local(
         self, prompt: str, model_id: str | None, max_tokens: int, temperature: float
     ) -> dict[str, Any]:
-        """Complete using local HuggingFace model."""
+        """
+        Complete using local HuggingFace model.
+        Args:
+            prompt: The prompt to use for text completion.
+            model_id: The model ID to use for text completion.
+            max_tokens: The maximum number of tokens to generate.
+            temperature: The temperature to use for text completion.
+        Returns:
+            A dictionary containing the text completion.
+        """
         model = self.registry.get_model(model_id or "default")
         if model is None:
             logger.warning("No local model loaded, returning placeholder")

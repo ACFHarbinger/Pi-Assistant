@@ -1,7 +1,7 @@
 import { useAgentStore } from "./stores/agentStore";
 import { AgentStatus } from "./components/AgentStatus";
-import { ChatInterface } from "./components/ChatInterface";
-import { TaskInput } from "./components/TaskInput";
+import { ChatInterface } from "./components/ChatInterface.tsx";
+import { TaskInput } from "./components/TaskInput.tsx";
 
 function App() {
     const { state } = useAgentStore();
@@ -42,7 +42,7 @@ function App() {
                                     <span className="text-gray-400">State</span>
                                     <span className="font-medium">{getStateLabel(state)}</span>
                                 </div>
-                                {"iteration" in (state as any).data && (
+                                {state.data && "iteration" in state.data && (
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Iteration</span>
                                         <span className="font-mono">{(state as any).data.iteration}</span>

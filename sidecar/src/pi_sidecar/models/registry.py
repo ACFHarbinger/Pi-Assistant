@@ -23,12 +23,21 @@ class ModelRegistry:
     """Registry for managing loaded models."""
 
     def __init__(self, models_dir: Path | None = None):
+        """
+        Initialize the model registry.
+        Args:
+            models_dir: The directory to store models.
+        """
         self.models_dir = models_dir or Path.home() / ".pi-assistant" / "models"
         self.models_dir.mkdir(parents=True, exist_ok=True)
         self._loaded: dict[str, LoadedModel] = {}
 
     def list_models(self) -> list[dict]:
-        """List available models."""
+        """
+        List available models.
+        Returns:
+            A list of dictionaries containing the model information.
+        """
         models = []
 
         # List HuggingFace models in models_dir
@@ -52,7 +61,13 @@ class ModelRegistry:
         return models
 
     async def load_model(self, model_id: str) -> LoadedModel:
-        """Load a model by ID."""
+        """
+        Load a model by ID.
+        Args:
+            model_id: The model ID to load.
+        Returns:
+            A LoadedModel object containing the model and tokenizer.
+        """
         if model_id in self._loaded:
             logger.info("Model already loaded: %s", model_id)
             return self._loaded[model_id]
@@ -80,11 +95,23 @@ class ModelRegistry:
         return loaded
 
     def get_model(self, model_id: str) -> LoadedModel | None:
-        """Get a loaded model, or None if not loaded."""
+        """
+        Get a loaded model, or None if not loaded.
+        Args:
+            model_id: The model ID to get.
+        Returns:
+            A LoadedModel object containing the model and tokenizer.
+        """
         return self._loaded.get(model_id)
 
     def unload_model(self, model_id: str) -> bool:
-        """Unload a model to free memory."""
+        """
+        Unload a model to free memory.
+        Args:
+            model_id: The model ID to unload.
+        Returns:
+            A boolean indicating whether the model was unloaded.
+        """
         if model_id in self._loaded:
             del self._loaded[model_id]
             logger.info("Unloaded model: %s", model_id)
