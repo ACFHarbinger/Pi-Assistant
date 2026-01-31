@@ -29,11 +29,21 @@ impl AudioRecorder {
 
     pub fn start(&mut self) -> Result<()> {
         let host = cpal::default_host();
-        let device = host
-            .default_input_device()
-            .ok_or_else(|| anyhow!("No input device found"))?;
+        let devices = host.input_devices()?;
 
-        info!("Using default input device: {}", device.name()?);
+        let device = devices
+            .filter(|d| {
+                d.name()
+                    .map(|n| {
+                        n.to_lowercase().contains("pulse") || n.to_lowercase().contains("pipewire")
+                    })
+                    .unwrap_or(false)
+            })
+            .next()
+            .or_else(|| host.default_input_device())
+            .ok_or_else(|| anyhow!("No suitable input device found"))?;
+
+        info!("Using input device: {}", device.name()?);
 
         let config = device.default_input_config()?;
         let sample_format = config.sample_format();

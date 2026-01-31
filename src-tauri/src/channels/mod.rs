@@ -11,6 +11,29 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Type of media attachment received from a channel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MediaType {
+    Photo,
+    Voice,
+    Audio,
+    Document,
+    Video,
+}
+
+/// A media attachment from a channel message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaAttachment {
+    /// Type of media
+    pub media_type: MediaType,
+    /// Local file path (after download)
+    pub file_path: String,
+    /// Original file name, if available
+    pub file_name: Option<String>,
+    /// MIME type, if available
+    pub mime_type: Option<String>,
+}
+
 /// A message received from a channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelMessage {
@@ -30,6 +53,9 @@ pub struct ChannelMessage {
     pub chat_id: String,
     /// Whether this is a private/DM conversation
     pub is_private: bool,
+    /// Media attachments
+    #[serde(default)]
+    pub media: Vec<MediaAttachment>,
 }
 
 /// Response to send back to a channel.

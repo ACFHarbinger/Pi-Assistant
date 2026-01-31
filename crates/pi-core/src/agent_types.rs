@@ -1,6 +1,7 @@
 //! Agent types shared across the application.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Agent state machine.
@@ -83,6 +84,9 @@ pub enum AgentCommand {
         sender_name: Option<String>,
         text: String,
         chat_id: String,
+        /// Media attachment file paths with metadata (type, file_name)
+        #[serde(default)]
+        media: Vec<HashMap<String, String>>,
     },
 }
 

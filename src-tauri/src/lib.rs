@@ -90,6 +90,7 @@ pub fn run() {
                                     Box::new(crate::channels::telegram::TelegramChannel::new(
                                         token,
                                         state.agent_cmd_tx.clone(),
+                                        state.sidecar.clone(),
                                     ));
                                 for user in tg_config.allowed_users {
                                     channel.allow_user(user).await;
@@ -152,6 +153,8 @@ pub fn run() {
             commands::cron::remove_cron_job,
             commands::voice::start_voice_listener,
             commands::voice::stop_voice_listener,
+            commands::voice::push_to_talk_start,
+            commands::voice::push_to_talk_stop,
             commands::auth::start_oauth,
             commands::auth::exchange_oauth_code,
             commands::auth::start_claude_oauth,

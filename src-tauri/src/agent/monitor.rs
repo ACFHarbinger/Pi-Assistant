@@ -135,6 +135,7 @@ pub async fn spawn_agent_monitor(
                 sender_name,
                 text,
                 chat_id,
+                media,
             }) => {
                 if let Some(ref handle) = current_loop {
                     // Forward to running loop
@@ -147,6 +148,7 @@ pub async fn spawn_agent_monitor(
                             sender_name,
                             text,
                             chat_id,
+                            media,
                         })
                         .await;
                 } else {

@@ -449,6 +449,7 @@ pub async fn save_telegram_config(
             let channel = Box::new(crate::channels::telegram::TelegramChannel::new(
                 token.clone(),
                 state.agent_cmd_tx.clone(),
+                state.sidecar.clone(),
             ));
             // Set allowed users
             for user in &config.allowed_users {

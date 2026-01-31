@@ -61,6 +61,7 @@ impl EventHandler for Handler {
             timestamp: msg.timestamp.unix_timestamp(),
             chat_id: msg.channel_id.to_string(),
             is_private: is_dm,
+            media: vec![],
         };
 
         // Forward to agent
@@ -73,6 +74,7 @@ impl EventHandler for Handler {
                 sender_name: channel_msg.sender_name,
                 text: channel_msg.text,
                 chat_id: channel_msg.chat_id,
+                media: vec![],
             })
             .await
         {
