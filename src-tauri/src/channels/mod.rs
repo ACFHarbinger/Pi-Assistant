@@ -4,6 +4,7 @@
 //! (Telegram, Discord, etc.) to allow the agent to receive tasks and
 //! respond through multiple channels.
 
+pub mod discord;
 pub mod telegram;
 
 use async_trait::async_trait;

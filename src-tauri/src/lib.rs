@@ -71,6 +71,44 @@ pub fn run() {
                 );
                 ws_server.spawn();
 
+                // Initialize channels from config
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Telegram
+                    if let Ok(tg_config) = commands::config::get_telegram_config().await {
+                        if tg_config.enabled {
+                            if let Some(token) = tg_config.token {
+                                let state = app_handle.state::<state::AppState>();
+                                let channel =
+                                    Box::new(crate::channels::telegram::TelegramChannel::new(
+                                        token,
+                                        state.agent_cmd_tx.clone(),
+                                    ));
+                                for user in tg_config.allowed_users {
+                                    channel.allow_user(user).await;
+                                }
+                                state.channel_manager.add_channel(channel).await;
+                                let _ = state.channel_manager.start_channel("telegram").await;
+                            }
+                        }
+                    }
+                    // Discord
+                    if let Ok(discord_config) = commands::config::get_discord_config().await {
+                        if discord_config.enabled {
+                            if let Some(token) = discord_config.token {
+                                let state = app_handle.state::<state::AppState>();
+                                let channel =
+                                    Box::new(crate::channels::discord::DiscordChannel::new(
+                                        token,
+                                        state.agent_cmd_tx.clone(),
+                                    ));
+                                state.channel_manager.add_channel(channel).await;
+                                let _ = state.channel_manager.start_channel("discord").await;
+                            }
+                        }
+                    }
+                });
+
                 app.manage(state);
             });
             tracing::info!("Application state and agent monitor initialized");
@@ -100,6 +138,8 @@ pub fn run() {
             commands::config::save_current_model,
             commands::config::get_telegram_config,
             commands::config::save_telegram_config,
+            commands::config::get_discord_config,
+            commands::config::save_discord_config,
             commands::cron::get_cron_jobs,
             commands::cron::add_cron_job,
             commands::cron::remove_cron_job,

@@ -51,6 +51,12 @@ pub struct TelegramConfig {
     pub allowed_users: Vec<u64>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+pub struct DiscordConfig {
+    pub token: Option<String>,
+    pub enabled: bool,
+}
+
 // ── Helper: Config Paths ─────────────────────────────────────────────
 
 fn get_config_dir() -> Result<PathBuf> {
@@ -460,6 +466,55 @@ pub async fn save_telegram_config(
         state
             .channel_manager
             .stop_channel("telegram")
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_discord_config() -> Result<DiscordConfig, String> {
+    let path = get_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("discord.json");
+    if !path.exists() {
+        return Ok(DiscordConfig::default());
+    }
+    let content = fs::read_to_string(&path).await.map_err(|e| e.to_string())?;
+    serde_json::from_str(&content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn save_discord_config(
+    state: tauri::State<'_, crate::state::AppState>,
+    config: DiscordConfig,
+) -> Result<(), String> {
+    let path = get_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("discord.json");
+    let json = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&path, json).await.map_err(|e| e.to_string())?;
+
+    // If enabled, start/restart the channel
+    if config.enabled {
+        if let Some(token) = &config.token {
+            let channel = Box::new(crate::channels::discord::DiscordChannel::new(
+                token.clone(),
+                state.agent_cmd_tx.clone(),
+            ));
+
+            state.channel_manager.add_channel(channel).await;
+            state
+                .channel_manager
+                .start_channel("discord")
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+    } else {
+        state
+            .channel_manager
+            .stop_channel("discord")
             .await
             .map_err(|e| e.to_string())?;
     }

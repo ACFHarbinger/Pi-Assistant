@@ -29,6 +29,8 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
     const [isResetting, setIsResetting] = useState(false);
     const [telegramConfig, setTelegramConfig] = useState<any>({ token: '', enabled: false, allowed_users: [] });
     const [telegramLoading, setTelegramLoading] = useState(false);
+    const [discordConfig, setDiscordConfig] = useState<any>({ token: '', enabled: false });
+    const [discordLoading, setDiscordLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -46,6 +48,8 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
             setModelsConfig(models);
             const tg = await invoke('get_telegram_config');
             setTelegramConfig(tg);
+            const dc = await invoke('get_discord_config');
+            setDiscordConfig(dc);
         } catch (e) {
             console.error('Failed to load config:', e);
         }
@@ -556,6 +560,62 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                                     className="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 disabled:opacity-50"
                                 >
                                     {telegramLoading ? 'Saving...' : 'Apply & Save Config'}
+                                </button>
+                            </div>
+
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xl">💬</span>
+                                        <div className="font-bold dark:text-white">Discord Bot</div>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={discordConfig.enabled}
+                                            onChange={async (e) => {
+                                                const newConfig = { ...discordConfig, enabled: e.target.checked };
+                                                setDiscordConfig(newConfig);
+                                                try {
+                                                    await invoke('save_discord_config', { config: newConfig });
+                                                } catch (err) {
+                                                    alert('Failed to toggle Discord: ' + err);
+                                                    setDiscordConfig(discordConfig);
+                                                }
+                                            }}
+                                        />
+                                        <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                    </label>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase">Bot Token</label>
+                                    <input
+                                        type="password"
+                                        placeholder="Enter bot token from Discord Developer Portal"
+                                        className="w-full p-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-sm dark:text-white"
+                                        value={discordConfig.token || ''}
+                                        onChange={(e) => setDiscordConfig({ ...discordConfig, token: e.target.value })}
+                                    />
+                                </div>
+
+                                <button
+                                    disabled={discordLoading}
+                                    onClick={async () => {
+                                        setDiscordLoading(true);
+                                        try {
+                                            await invoke('save_discord_config', { config: discordConfig });
+                                            alert('Discord configuration saved!');
+                                        } catch (err) {
+                                            alert('Failed to save config: ' + err);
+                                        } finally {
+                                            setDiscordLoading(false);
+                                        }
+                                    }}
+                                    className="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {discordLoading ? 'Saving...' : 'Apply & Save Config'}
                                 </button>
                             </div>
                         </div>

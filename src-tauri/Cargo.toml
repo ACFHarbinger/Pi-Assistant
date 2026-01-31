@@ -50,6 +50,14 @@ teloxide = { version = "0.14", default-features = false, features = [
 cpal = "0.15"
 hound = "3.5"
 vosk = "0.3"
+serenity = { version = "0.12", default-features = false, features = [
+    "rustls_backend",
+    "client",
+    "gateway",
+    "model",
+    "standard_framework",
+    "utils",
+] }
 
 # Internal crates
 pi-core.workspace = true
