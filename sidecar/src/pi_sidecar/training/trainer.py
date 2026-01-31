@@ -15,14 +15,40 @@ class ProgressCallback(Callback):
     """Callback for streaming training progress."""
 
     def __init__(self, progress_fn: Optional[Callable[[dict], None]] = None):
+        """
+        Initialize the callback.
+        Args:
+            self: The callback.
+            progress_fn: The progress function.
+        Returns:
+            None
+        """
         self.progress_fn = progress_fn
         self.current_epoch = 0
         self.total_epochs = 0
 
     def on_train_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+        """
+        Called when training starts.
+        Args:
+            self: The callback.
+            trainer: The trainer.
+            pl_module: The lightning module.
+        Returns:
+            None
+        """
         self.total_epochs = trainer.max_epochs or 0
 
     def on_train_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+        """
+        Called when an epoch starts.
+        Args:
+            self: The callback.
+            trainer: The trainer.
+            pl_module: The lightning module.
+        Returns:
+            None
+        """
         self.current_epoch = trainer.current_epoch
         self._emit_progress("epoch_start", {"epoch": self.current_epoch})
 
@@ -34,6 +60,18 @@ class ProgressCallback(Callback):
         batch: Any,
         batch_idx: int,
     ) -> None:
+        """
+        Called when a batch ends.
+        Args:
+            self: The callback.
+            trainer: The trainer.
+            pl_module: The lightning module.
+            outputs: The outputs.
+            batch: The batch.
+            batch_idx: The batch index.
+        Returns:
+            None
+        """
         if batch_idx % 10 == 0:  # Report every 10 batches
             loss = outputs["loss"].item() if isinstance(outputs, dict) else outputs.item()
             self._emit_progress("batch", {
@@ -43,6 +81,15 @@ class ProgressCallback(Callback):
             })
 
     def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+        """
+        Called when an epoch ends.
+        Args:
+            self: The callback.
+            trainer: The trainer.
+            pl_module: The lightning module.
+        Returns:
+            None
+        """
         metrics = {k: v.item() if torch.is_tensor(v) else v for k, v in trainer.callback_metrics.items()}
         self._emit_progress("epoch_end", {
             "epoch": self.current_epoch,
@@ -50,9 +97,27 @@ class ProgressCallback(Callback):
         })
 
     def on_train_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+        """
+        Called when training ends.
+        Args:
+            self: The callback.
+            trainer: The trainer.
+            pl_module: The lightning module.
+        Returns:
+            None
+        """
         self._emit_progress("complete", {"epochs": self.current_epoch + 1})
 
     def _emit_progress(self, event: str, data: dict) -> None:
+        """
+        Emit progress.
+        Args:
+            self: The callback.
+            event: The event.
+            data: The data.
+        Returns:
+            None
+        """
         if self.progress_fn:
             self.progress_fn({"event": event, **data})
 
@@ -66,6 +131,16 @@ class TrainingOrchestrator:
         output_dir: Optional[Path] = None,
         progress_fn: Optional[Callable[[dict], None]] = None,
     ):
+        """
+        Initialize the trainer.
+        Args:
+            self: The trainer.
+            model_name: The name of the model.
+            output_dir: The output directory.
+            progress_fn: The progress function.
+        Returns:
+            None
+        """
         self.model_name = model_name
         self.output_dir = output_dir or Path("./checkpoints")
         self.progress_fn = progress_fn
@@ -78,7 +153,15 @@ class TrainingOrchestrator:
         learning_rate: float = 5e-5,
         warmup_steps: int = 100,
     ) -> None:
-        """Prepare the model for training."""
+        """
+        Prepare the model for training.
+        Args:
+            self: The trainer.
+            learning_rate: The learning rate.
+            warmup_steps: The number of warmup steps.
+        Returns:
+            None
+        """
         self.module = PiLightningModule(
             model_name=self.model_name,
             learning_rate=learning_rate,
@@ -93,7 +176,18 @@ class TrainingOrchestrator:
         batch_size: int = 8,
         accelerator: str = "auto",
     ) -> dict:
-        """Run training."""
+        """
+        Run training.
+        Args:
+            self: The trainer.
+            train_texts: The training texts.
+            val_texts: The validation texts.
+            epochs: The number of epochs.
+            batch_size: The batch size.
+            accelerator: The accelerator.
+        Returns:
+            dict: The training results.
+        """
         if self.module is None:
             self.prepare()
         
@@ -136,7 +230,14 @@ class TrainingOrchestrator:
         }
 
     def save(self, path: Optional[Path] = None) -> Path:
-        """Save the trained model."""
+        """
+        Save the trained model.
+        Args:
+            self: The trainer.
+            path: The path to save the model.
+        Returns:
+            Path: The path to the saved model.
+        """
         if self.module is None:
             raise RuntimeError("No model to save")
         

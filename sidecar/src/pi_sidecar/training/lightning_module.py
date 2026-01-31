@@ -17,6 +17,17 @@ class PiLightningModule(pl.LightningModule):
         warmup_steps: int = 100,
         weight_decay: float = 0.01,
     ):
+        """
+        Initialize the lightning module.
+        Args:
+            self: The lightning module.
+            model_name: The name of the model.
+            learning_rate: The learning rate.
+            warmup_steps: The number of warmup steps.
+            weight_decay: The weight decay.
+        Returns:
+            None
+        """
         super().__init__()
         self.save_hyperparameters()
         
@@ -35,7 +46,16 @@ class PiLightningModule(pl.LightningModule):
             self.model.config.pad_token_id = self.tokenizer.eos_token_id
 
     def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, labels: Optional[torch.Tensor] = None) -> Any:
-        """Forward pass."""
+        """
+        Forward pass.
+        Args:
+            self: The lightning module.
+            input_ids: The input IDs.
+            attention_mask: The attention mask.
+            labels: The labels.
+        Returns:
+            Any: The output of the model.
+        """
         return self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -43,7 +63,15 @@ class PiLightningModule(pl.LightningModule):
         )
 
     def training_step(self, batch: dict, batch_idx: int) -> torch.Tensor:
-        """Training step."""
+        """
+        Training step.
+        Args:
+            self: The lightning module.
+            batch: The batch.
+            batch_idx: The batch index.
+        Returns:
+            torch.Tensor: The loss.
+        """
         outputs = self(
             input_ids=batch["input_ids"],
             attention_mask=batch["attention_mask"],
@@ -55,7 +83,15 @@ class PiLightningModule(pl.LightningModule):
         return loss
 
     def validation_step(self, batch: dict, batch_idx: int) -> torch.Tensor:
-        """Validation step."""
+        """
+        Validation step.
+        Args:
+            self: The lightning module.
+            batch: The batch.
+            batch_idx: The batch index.
+        Returns:
+            torch.Tensor: The loss.
+        """
         outputs = self(
             input_ids=batch["input_ids"],
             attention_mask=batch["attention_mask"],
@@ -67,7 +103,13 @@ class PiLightningModule(pl.LightningModule):
         return loss
 
     def configure_optimizers(self) -> dict:
-        """Configure optimizer and scheduler."""
+        """
+        Configure optimizer and scheduler.
+        Args:
+            self: The lightning module.
+        Returns:
+            dict: The optimizer and scheduler.
+        """
         optimizer = torch.optim.AdamW(
             self.parameters(),
             lr=self.learning_rate,
@@ -90,7 +132,16 @@ class PiLightningModule(pl.LightningModule):
         }
 
     def generate(self, prompt: str, max_new_tokens: int = 100, **kwargs) -> str:
-        """Generate text from a prompt."""
+        """
+        Generate text from a prompt.
+        Args:
+            self: The lightning module.
+            prompt: The prompt.
+            max_new_tokens: The maximum number of new tokens.
+            **kwargs: Additional arguments.
+        Returns:
+            str: The generated text.
+        """
         inputs = self.tokenizer(prompt, return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
         

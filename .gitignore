@@ -424,3 +424,6 @@ dist/
 # Virtual Environments
 .venv/
 sidecar/.venv/
+
+# Gradle
+**/.gradle/

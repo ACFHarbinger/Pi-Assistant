@@ -8,13 +8,27 @@ class CompletionEngine:
     """Generate text completions using HuggingFace models."""
 
     def __init__(self, model_name: str = "gpt2"):
+        """
+        Initialize the completion engine.
+        Args:
+            self: The completion engine.
+            model_name: The name of the model.
+        Returns:
+            None
+        """
         self.model_name = model_name
         self.model = None
         self.tokenizer = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def _load_model(self) -> None:
-        """Load the model and tokenizer."""
+        """
+        Load the model and tokenizer.
+        Args:
+            self: The completion engine.
+        Returns:
+            None
+        """
         from transformers import AutoModelForCausalLM, AutoTokenizer
         
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -34,7 +48,18 @@ class CompletionEngine:
         top_p: float = 0.9,
         stop_sequences: Optional[List[str]] = None,
     ) -> str:
-        """Generate a completion for the given prompt."""
+        """
+        Generate a completion for the given prompt.
+        Args:
+            self: The completion engine.
+            prompt: The prompt to complete.
+            max_tokens: The maximum number of tokens to generate.
+            temperature: The temperature.
+            top_p: The top-p value.
+            stop_sequences: The stop sequences.
+        Returns:
+            str: The completion.
+        """
         if self.model is None:
             self._load_model()
         
@@ -64,7 +89,14 @@ class CompletionEngine:
         return completion
 
     def load_model(self, model_path: str) -> None:
-        """Load a model from a local path."""
+        """
+        Load a model from a local path.
+        Args:
+            self: The completion engine.
+            model_path: The path to the model.
+        Returns:
+            None
+        """
         from transformers import AutoModelForCausalLM, AutoTokenizer
         
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -78,7 +110,13 @@ _completion_engine: Optional[CompletionEngine] = None
 
 
 def get_completion_engine() -> CompletionEngine:
-    """Get the singleton completion engine."""
+    """
+    Get the singleton completion engine.
+    Args:
+        None
+    Returns:
+        CompletionEngine: The singleton completion engine.
+    """
     global _completion_engine
     if _completion_engine is None:
         _completion_engine = CompletionEngine()
