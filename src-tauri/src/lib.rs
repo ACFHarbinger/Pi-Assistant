@@ -52,6 +52,9 @@ pub fn run() {
             commands::config::load_model,
             commands::config::get_mcp_marketplace,
             commands::config::reset_agent,
+            commands::config::save_api_key,
+            commands::auth::start_oauth,
+            commands::auth::exchange_oauth_code,
             commands::sidecar::sidecar_request,
         ])
         .run(tauri::generate_context!())

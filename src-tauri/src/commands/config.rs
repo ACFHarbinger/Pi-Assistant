@@ -259,6 +259,26 @@ pub async fn load_model(
     Ok(())
 }
 #[tauri::command]
+pub async fn save_api_key(provider: String, key: String) -> Result<(), String> {
+    let config_dir = get_config_dir().map_err(|e| e.to_string())?;
+    let path = config_dir.join("secrets.json");
+
+    let mut secrets: HashMap<String, String> = if path.exists() {
+        let content = fs::read_to_string(&path).await.map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    secrets.insert(provider, key);
+
+    let json = serde_json::to_string_pretty(&secrets).map_err(|e| e.to_string())?;
+    fs::write(&path, json).await.map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn reset_agent(options: ResetOptions) -> Result<(), String> {
     let config_dir = get_config_dir().map_err(|e| e.to_string())?;
 

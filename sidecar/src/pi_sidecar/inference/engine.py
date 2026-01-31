@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 from pi_sidecar.models.registry import ModelRegistry
@@ -174,7 +175,19 @@ Available tools: shell, code, browser"""
 
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
-                raise ValueError("ANTHROPIC_API_KEY environment variable not set")
+                # Try loading from secrets.json
+                secrets_path = Path.home() / ".pi-assistant" / "secrets.json"
+                if secrets_path.exists():
+                    import json
+                    try:
+                        with open(secrets_path, "r") as f:
+                            secrets = json.load(f)
+                            api_key = secrets.get("anthropic") or secrets.get("anthropic_oauth")
+                    except Exception as e:
+                        logger.error("Failed to load secrets: %s", e)
+
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY environment variable not set and no secret found")
             self._anthropic_client = anthropic.AsyncAnthropic(api_key=api_key)
 
         model = model_id or "claude-sonnet-4-20250514"
@@ -214,12 +227,24 @@ Available tools: shell, code, browser"""
 
             # Check for API key or OAuth credentials
             api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                 # Try loading from secrets.json
+                secrets_path = Path.home() / ".pi-assistant" / "secrets.json"
+                if secrets_path.exists():
+                    import json
+                    try:
+                        with open(secrets_path, "r") as f:
+                            secrets = json.load(f)
+                            api_key = secrets.get("gemini") or secrets.get("google_oauth") or secrets.get("gemini_oauth")
+                    except Exception as e:
+                        logger.error("Failed to load secrets: %s", e)
+
             if api_key:
                 genai.configure(api_key=api_key)
             else:
                 # OAuth flow would be configured here
                 raise ValueError(
-                    "GOOGLE_API_KEY environment variable not set. "
+                    "GOOGLE_API_KEY environment variable not set and no secret found. "
                     "OAuth flow not yet implemented."
                 )
             self._gemini_client = genai
