@@ -41,6 +41,10 @@ impl Tool for CronTool {
                     "type": "string",
                     "description": "Description of what the agent should do when triggered (required for 'add')"
                 },
+                "timezone": {
+                    "type": "string",
+                    "description": "IANA timezone name (e.g., 'America/New_York', 'Europe/London'). Defaults to UTC if not specified."
+                },
                 "id": {
                     "type": "string",
                     "description": "Job UUID (required for 'remove')"
@@ -70,9 +74,13 @@ impl Tool for CronTool {
                     .get("task_description")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("Missing task_description"))?;
+                let timezone = params
+                    .get("timezone")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
                 let id = self
                     .cron_manager
-                    .add_job(schedule.to_string(), task_desc.to_string())
+                    .add_job(schedule.to_string(), task_desc.to_string(), timezone)
                     .await?;
                 Ok(
                     ToolResult::success(format!("Scheduled task '{}' with ID: {}", task_desc, id))

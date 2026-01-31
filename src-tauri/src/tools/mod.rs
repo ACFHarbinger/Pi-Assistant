@@ -111,9 +111,13 @@ impl ToolRegistry {
         registry
     }
 
-    /// Register the canvas tool (requires AppHandle).
-    pub fn register_canvas_tool(&mut self, app_handle: tauri::AppHandle) {
-        self.register(Arc::new(canvas::CanvasTool::new(app_handle)));
+    /// Register the canvas tool (requires AppHandle and state manager).
+    pub fn register_canvas_tool(
+        &mut self,
+        app_handle: tauri::AppHandle,
+        state_manager: Arc<canvas::CanvasStateManager>,
+    ) {
+        self.register(Arc::new(canvas::CanvasTool::new(app_handle, state_manager)));
     }
 
     /// Register a tool.

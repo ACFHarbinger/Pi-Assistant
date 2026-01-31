@@ -2,8 +2,8 @@
 //!
 //! Uses teloxide to connect to the Telegram Bot API and route
 //! messages to the Pi-Assistant agent. Supports text, photo, voice,
-//! audio, and document messages with automatic transcription of
-//! voice/audio via the sidecar STT pipeline.
+//! audio, document, and video messages with automatic transcription
+//! of voice/audio via the sidecar STT pipeline.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -20,6 +20,17 @@ use tracing::{error, info, warn};
 use super::{Channel, ChannelResponse, MediaAttachment, MediaType};
 use crate::ipc::SidecarHandle;
 use pi_core::agent_types::AgentCommand;
+use std::time::{Duration, Instant};
+
+/// A pending pairing code.
+#[derive(Clone)]
+struct PendingPair {
+    code: String,
+    user_id: u64,
+    created_at: Instant,
+}
+
+const PAIR_CODE_EXPIRY_SECS: u64 = 300; // 5 minutes
 
 /// Telegram bot channel.
 pub struct TelegramChannel {
@@ -37,6 +48,8 @@ pub struct TelegramChannel {
     ml_sidecar: Arc<Mutex<SidecarHandle>>,
     /// Media download directory
     media_dir: PathBuf,
+    /// Pending pairing codes
+    pending_pairs: Arc<RwLock<Vec<PendingPair>>>,
 }
 
 impl TelegramChannel {
@@ -60,6 +73,7 @@ impl TelegramChannel {
             shutdown_tx: Arc::new(Mutex::new(None)),
             ml_sidecar,
             media_dir,
+            pending_pairs: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -70,6 +84,35 @@ impl TelegramChannel {
             users.push(user_id);
             info!("Allowed Telegram user: {}", user_id);
         }
+    }
+
+    /// Check and validate a pairing code.
+    async fn validate_pairing_code(
+        code: &str,
+        pending_pairs: &Arc<RwLock<Vec<PendingPair>>>,
+        allowed_users: &Arc<RwLock<Vec<u64>>>,
+    ) -> Option<u64> {
+        let mut pairs = pending_pairs.write().await;
+
+        // Clean up expired codes
+        pairs.retain(|p| p.created_at.elapsed() < Duration::from_secs(PAIR_CODE_EXPIRY_SECS));
+
+        // Find matching code
+        if let Some(idx) = pairs.iter().position(|p| p.code == code.to_uppercase()) {
+            let pair = pairs.remove(idx);
+            let user_id = pair.user_id;
+
+            // Add user to allowed list
+            let mut users = allowed_users.write().await;
+            if !users.contains(&user_id) {
+                users.push(user_id);
+                info!("Telegram user {} authorized via pairing code", user_id);
+            }
+
+            return Some(user_id);
+        }
+
+        None
     }
 
     /// Download a file from Telegram by file_id to the media directory.
@@ -155,6 +198,7 @@ impl TelegramChannel {
         message_tx: mpsc::Sender<AgentCommand>,
         ml_sidecar: Arc<Mutex<SidecarHandle>>,
         media_dir: PathBuf,
+        pending_pairs: Arc<RwLock<Vec<PendingPair>>>,
     ) -> ResponseResult<()> {
         // Get sender info
         let sender = match &msg.from {
@@ -167,19 +211,70 @@ impl TelegramChannel {
 
         // Check if user is allowed
         let users = allowed_users.read().await;
-        if !users.is_empty() && !users.contains(&sender.id.0) {
+        let is_authorized = users.is_empty() || users.contains(&sender.id.0);
+        drop(users);
+
+        // Check for /pair command from unauthorized users
+        if let Some(text) = msg.text() {
+            if text.starts_with("/pair ") {
+                let code = text.strip_prefix("/pair ").unwrap_or("").trim();
+                if let Some(_user_id) =
+                    Self::validate_pairing_code(code, &pending_pairs, &allowed_users).await
+                {
+                    bot.send_message(
+                        msg.chat.id,
+                        "✅ Pairing successful! You are now authorized to use this bot.",
+                    )
+                    .await?;
+                    return Ok(());
+                } else {
+                    bot.send_message(
+                        msg.chat.id,
+                        "❌ Invalid or expired pairing code. Please request a new one.",
+                    )
+                    .await?;
+                    return Ok(());
+                }
+            }
+        }
+
+        if !is_authorized {
+            // Generate pairing code for unauthorized user
+            use rand::Rng;
+            let code: String = rand::thread_rng()
+                .sample_iter(&rand::distributions::Alphanumeric)
+                .take(6)
+                .map(char::from)
+                .collect::<String>()
+                .to_uppercase();
+
+            let pair = PendingPair {
+                code: code.clone(),
+                user_id: sender.id.0,
+                created_at: Instant::now(),
+            };
+            pending_pairs.write().await.push(pair);
+
             warn!(
-                "Unauthorized user {} attempted to send message",
-                sender.id.0
+                "Unauthorized user {} - generated pairing code: {}",
+                sender.id.0, code
             );
+
             bot.send_message(
                 msg.chat.id,
-                "⚠️ You are not authorized to use this bot. Contact the owner to request access.",
+                format!(
+                    "⚠️ You are not authorized to use this bot.\n\n\
+                    Your pairing code is: `{}`\n\n\
+                    Ask the bot owner to authorize this code in Settings.\n\
+                    Once authorized, send `/pair {}` to complete pairing.\n\n\
+                    This code expires in 5 minutes.",
+                    code, code
+                ),
             )
+            .parse_mode(ParseMode::MarkdownV2)
             .await?;
             return Ok(());
         }
-        drop(users);
 
         let sender_id = sender.id.0.to_string();
         let sender_name = Some(sender.full_name());
@@ -333,6 +428,37 @@ impl TelegramChannel {
             }
         }
 
+        // Video message
+        if let Some(video) = msg.video() {
+            if let Some(path) = Self::download_file(&bot, &video.file.id, &media_dir, "mp4").await {
+                let path_str = path.to_string_lossy().to_string();
+                let file_name = video
+                    .file_name
+                    .clone()
+                    .unwrap_or_else(|| "video.mp4".to_string());
+
+                if text.is_empty() {
+                    text = format!("[Video attached: {}]", file_name);
+                } else {
+                    text.push_str(&format!("\n[Video attached: {}]", file_name));
+                }
+
+                let attachment = MediaAttachment {
+                    media_type: MediaType::Video,
+                    file_path: path_str.clone(),
+                    file_name: Some(file_name.clone()),
+                    mime_type: video.mime_type.clone().map(|m| m.to_string()),
+                };
+                media.push(attachment);
+
+                let mut m = HashMap::new();
+                m.insert("type".to_string(), "video".to_string());
+                m.insert("file_path".to_string(), path_str);
+                m.insert("file_name".to_string(), file_name);
+                media_maps.push(m);
+            }
+        }
+
         // Skip if no content at all
         if text.is_empty() && media.is_empty() {
             return Ok(());
@@ -385,6 +511,7 @@ impl Channel for TelegramChannel {
         let running = self.running.clone();
         let ml_sidecar = self.ml_sidecar.clone();
         let media_dir = self.media_dir.clone();
+        let pending_pairs = self.pending_pairs.clone();
 
         // Create shutdown channel
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
@@ -399,7 +526,8 @@ impl Channel for TelegramChannel {
                 let tx = message_tx.clone();
                 let sc = ml_sidecar.clone();
                 let md = media_dir.clone();
-                async move { Self::handle_message(bot, msg, allowed, tx, sc, md).await }
+                let pp = pending_pairs.clone();
+                async move { Self::handle_message(bot, msg, allowed, tx, sc, md, pp).await }
             });
 
             let mut dispatcher = Dispatcher::builder(bot, handler)

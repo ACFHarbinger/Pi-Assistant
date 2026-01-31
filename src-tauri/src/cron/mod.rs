@@ -1,4 +1,5 @@
 use anyhow::Result;
+use chrono_tz::Tz;
 use pi_core::agent_types::AgentCommand;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,6 +15,8 @@ pub struct CronJob {
     pub id: Uuid,
     pub schedule: String,
     pub task_description: String,
+    #[serde(default)]
+    pub timezone: Option<String>,
 }
 
 pub struct CronManager {
@@ -69,11 +72,17 @@ impl CronManager {
         Ok(())
     }
 
-    pub async fn add_job(&self, schedule: String, task_description: String) -> Result<Uuid> {
+    pub async fn add_job(
+        &self,
+        schedule: String,
+        task_description: String,
+        timezone: Option<String>,
+    ) -> Result<Uuid> {
         let job = CronJob {
             id: Uuid::new_v4(),
             schedule,
             task_description,
+            timezone,
         };
 
         self.add_job_to_scheduler_internal(job.clone()).await?;
@@ -88,13 +97,18 @@ impl CronManager {
         let task_desc = job.task_description.clone();
         let agent_cmd_tx = self.agent_cmd_tx.clone();
 
-        let cron_job = Job::new_async(schedule_str.as_str(), move |_uuid, _l| {
+        // Parse timezone if provided, otherwise use system local
+        let tz: Tz = job
+            .timezone
+            .as_ref()
+            .and_then(|s| s.parse::<Tz>().ok())
+            .unwrap_or_else(|| chrono_tz::UTC);
+
+        let cron_job = Job::new_async_tz(schedule_str.as_str(), tz, move |_uuid, _l| {
             let task_desc = task_desc.clone();
             let agent_cmd_tx = agent_cmd_tx.clone();
             Box::pin(async move {
                 info!("Triggering scheduled task: {}", task_desc);
-                // We send a ChatMessage command which will be handled by the agent loop
-                // This allows the agent to respond with personality
                 let cmd = AgentCommand::ChatMessage {
                     content: format!("Proactive Trigger: {}", task_desc),
                     provider: None,

@@ -56,8 +56,22 @@ pub fn run() {
 
                 // Register canvas tool (requires app handle)
                 {
+                    let config_dir = dirs::home_dir()
+                        .unwrap_or_else(|| std::path::PathBuf::from("."))
+                        .join(".pi-assistant");
+                    let canvas_state = std::sync::Arc::new(
+                        crate::tools::canvas::CanvasStateManager::new(&config_dir),
+                    );
                     let mut registry = state.tool_registry.write().await;
-                    registry.register_canvas_tool(app.handle().clone());
+                    registry.register_canvas_tool(app.handle().clone(), canvas_state.clone());
+
+                    // Restore canvas state if persisted
+                    let app_handle = app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Some(html) = canvas_state.load().await {
+                            let _ = app_handle.emit("canvas-push", html);
+                        }
+                    });
                 }
 
                 // Bridge AgentState to Tauri events

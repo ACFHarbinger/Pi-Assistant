@@ -4,11 +4,29 @@ pub mod wake;
 use crate::voice::audio::AudioRecorder;
 use crate::voice::wake::WakeWordDetector;
 use pi_core::agent_types::AgentCommand;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
+
+/// Conversation mode state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConversationState {
+    /// Idle - waiting for wake word
+    Idle,
+    /// Active conversation - listening for follow-up
+    Active,
+    /// Recording user input
+    Recording,
+    /// Processing STT / waiting for agent response
+    Processing,
+}
+
+/// Silence timeout before returning to idle (seconds)
+const CONVERSATION_TIMEOUT_SECS: u64 = 10;
 
 pub struct VoiceManager {
     recorder: Arc<tokio::sync::Mutex<AudioRecorder>>,
@@ -22,6 +40,12 @@ pub struct VoiceManager {
     is_ptt_recording: bool,
     /// Directory for temporary WAV files
     media_dir: PathBuf,
+    /// Current conversation state
+    conversation_state: ConversationState,
+    /// Last activity timestamp (for timeout)
+    last_activity: Option<Instant>,
+    /// Whether continuous conversation mode is enabled
+    conversation_mode_enabled: bool,
 }
 
 impl VoiceManager {
@@ -40,6 +64,9 @@ impl VoiceManager {
             is_wake_listening: false,
             is_ptt_recording: false,
             media_dir,
+            conversation_state: ConversationState::Idle,
+            last_activity: None,
+            conversation_mode_enabled: true,
         }
     }
 
@@ -117,7 +144,61 @@ impl VoiceManager {
             cancel.cancel();
         }
         self.is_wake_listening = false;
+        self.conversation_state = ConversationState::Idle;
         info!("Voice listener stop requested");
+    }
+
+    /// Enable or disable continuous conversation mode.
+    pub fn set_conversation_mode(&mut self, enabled: bool) {
+        self.conversation_mode_enabled = enabled;
+        info!("Continuous conversation mode: {}", enabled);
+    }
+
+    /// Get current conversation state.
+    pub fn get_conversation_state(&self) -> ConversationState {
+        self.conversation_state
+    }
+
+    /// Signal that the agent has finished responding.
+    /// If conversation mode is enabled, this re-activates listening.
+    pub async fn on_agent_response_complete(&mut self) {
+        if self.conversation_mode_enabled
+            && self.conversation_state == ConversationState::Processing
+        {
+            self.conversation_state = ConversationState::Active;
+            self.last_activity = Some(Instant::now());
+            info!("Conversation mode: Re-enabled listening after agent response");
+
+            // Restart listening if not already active
+            if !self.is_wake_listening {
+                if let Err(e) = self.start_listening().await {
+                    info!("Failed to restart listening: {}", e);
+                }
+            }
+        }
+    }
+
+    /// Check for conversation timeout (called periodically)
+    pub fn check_conversation_timeout(&mut self) {
+        if self.conversation_state == ConversationState::Active {
+            if let Some(last) = self.last_activity {
+                if last.elapsed() > Duration::from_secs(CONVERSATION_TIMEOUT_SECS) {
+                    self.conversation_state = ConversationState::Idle;
+                    info!(
+                        "Conversation mode: Timed out after {} seconds of silence",
+                        CONVERSATION_TIMEOUT_SECS
+                    );
+                }
+            }
+        }
+    }
+
+    /// Mark conversation as active (user spoke)
+    pub fn mark_activity(&mut self) {
+        self.last_activity = Some(Instant::now());
+        if self.conversation_state == ConversationState::Idle {
+            self.conversation_state = ConversationState::Active;
+        }
     }
 
     /// Start a push-to-talk recording session.

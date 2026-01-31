@@ -14,10 +14,11 @@ pub async fn add_cron_job(
     state: State<'_, AppState>,
     schedule: String,
     task_description: String,
+    timezone: Option<String>,
 ) -> Result<Uuid, String> {
     state
         .cron_manager
-        .add_job(schedule, task_description)
+        .add_job(schedule, task_description, timezone)
         .await
         .map_err(|e| e.to_string())
 }

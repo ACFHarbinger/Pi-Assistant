@@ -61,6 +61,7 @@ serenity = { version = "0.12", default-features = false, features = [
     "utils",
 ] }
 serde_yaml = "0.9"
+chrono-tz = "0.9"
 
 # Internal crates
 pi-core.workspace = true
