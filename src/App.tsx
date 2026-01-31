@@ -4,8 +4,12 @@ import { ChatInterface } from "./components/ChatInterface.tsx";
 import { TaskInput } from "./components/TaskInput.tsx";
 import { PermissionDialog } from "./components/PermissionDialog.tsx";
 
+import Settings from "./components/Settings";
+import { useState } from "react";
+
 function App() {
     const { state } = useAgentStore();
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
@@ -21,7 +25,16 @@ function App() {
                             <p className="text-xs text-gray-400">Universal Agent Harness</p>
                         </div>
                     </div>
-                    <AgentStatus />
+                    <div className="flex items-center gap-4">
+                        <AgentStatus />
+                        <button
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="p-2 text-gray-400 hover:text-white transition-colors"
+                            title="Settings"
+                        >
+                            ⚙️
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -62,6 +75,9 @@ function App() {
 
             {/* Permission Dialog */}
             <PermissionDialog />
+
+            {/* Settings Dialog */}
+            <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
         </div>
     );
 }

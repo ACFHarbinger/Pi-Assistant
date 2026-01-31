@@ -41,6 +41,15 @@ pub fn run() {
             commands::agent::get_agent_state,
             commands::chat::send_message,
             commands::chat::get_history,
+            commands::config::get_mcp_config,
+            commands::config::save_mcp_server,
+            commands::config::remove_mcp_server,
+            commands::config::get_tools_config,
+            commands::config::toggle_tool,
+            commands::config::get_models_config,
+            commands::config::save_model,
+            commands::config::load_model,
+            commands::config::get_mcp_marketplace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

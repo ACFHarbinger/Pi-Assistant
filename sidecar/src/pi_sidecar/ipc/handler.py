@@ -37,6 +37,7 @@ class RequestHandler:
             "inference.plan": self._inference_plan,
             "model.list": self._model_list,
             "model.load": self._model_load,
+            "inference.load_model": self._inference_load_model,
         }
 
     async def dispatch(
@@ -58,6 +59,29 @@ class RequestHandler:
         if handler is None:
             raise ValueError(f"Unknown method: {method}")
         return await handler(params, progress_callback)
+    
+    # ... (existing handlers) ...
+
+    async def _inference_load_model(self, params, _cb):
+        """
+        Handle inference model load requests.
+        """
+        from pi_sidecar.inference.completion import get_completion_engine
+        
+        engine = get_completion_engine()
+        model_name = params.get("model_id") or params.get("path")
+        if not model_name:
+             raise ValueError("Missing model_id or path")
+             
+        # Use simple load_model, or if it's a path, handle accordingly
+        # This assumes the engine has logic to handle HF IDs 
+        # (The existing load_model implementation in completion.py handles paths/ids via from_pretrained)
+        
+        # We need to ensure we call the engine's method correctly
+        engine.model_name = model_name
+        engine._load_model() # This reloads based on self.model_name
+        
+        return {"status": "loaded", "model_id": model_name}
 
     # ── Built-in handlers ─────────────────────────────────────────
 
