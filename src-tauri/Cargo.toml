@@ -34,6 +34,9 @@ tower-http.workspace = true
 reqwest.workspace = true
 chromiumoxide.workspace = true
 futures.workspace = true
+async-trait = "0.1"
+regex = "1"
+dirs = "5"
 
 # Internal crates
 pi-core.workspace = true

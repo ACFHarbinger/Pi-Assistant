@@ -1,1 +1,5 @@
-"""Models module for model registry and versioning."""
+"""Model registry module."""
+
+from .registry import ModelRegistry
+
+__all__ = ["ModelRegistry"]

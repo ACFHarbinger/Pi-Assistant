@@ -1,0 +1,240 @@
+//! Sidecar lifecycle management and request/response routing.
+//!
+//! Spawns Python sidecar, routes NDJSON requests/responses via correlation IDs.
+
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::io::Write;
+use std::process::Stdio;
+use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, ChildStdin, Command};
+use tokio::sync::{mpsc, oneshot, Mutex};
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
+
+/// Request sent to the Python sidecar.
+#[derive(Debug, Serialize)]
+pub struct IpcRequest {
+    pub id: String,
+    pub method: String,
+    pub params: serde_json::Value,
+}
+
+/// Response from the Python sidecar.
+#[derive(Debug, Deserialize)]
+pub struct IpcResponse {
+    pub id: String,
+    #[serde(default)]
+    pub result: Option<serde_json::Value>,
+    #[serde(default)]
+    pub error: Option<IpcError>,
+    #[serde(default)]
+    pub progress: Option<serde_json::Value>,
+}
+
+/// Error from the sidecar.
+#[derive(Debug, Deserialize)]
+pub struct IpcError {
+    pub code: String,
+    pub message: String,
+}
+
+/// Progress update from the sidecar.
+#[derive(Debug, Clone)]
+pub struct ProgressUpdate {
+    pub request_id: String,
+    pub data: serde_json::Value,
+}
+
+/// Handle for the Python sidecar process.
+pub struct SidecarHandle {
+    child: Option<Child>,
+    stdin: Option<ChildStdin>,
+    pending: Arc<Mutex<HashMap<String, oneshot::Sender<Result<serde_json::Value>>>>>,
+    progress_tx: mpsc::Sender<ProgressUpdate>,
+    progress_rx: Option<mpsc::Receiver<ProgressUpdate>>,
+    python_path: String,
+    sidecar_module: String,
+}
+
+impl SidecarHandle {
+    /// Create a new sidecar handle (not yet started).
+    pub fn new() -> Self {
+        let (progress_tx, progress_rx) = mpsc::channel(256);
+        Self {
+            child: None,
+            stdin: None,
+            pending: Arc::new(Mutex::new(HashMap::new())),
+            progress_tx,
+            progress_rx: Some(progress_rx),
+            python_path: "python3".to_string(),
+            sidecar_module: "pi_sidecar".to_string(),
+        }
+    }
+
+    /// Take the progress receiver (can only be called once).
+    pub fn take_progress_rx(&mut self) -> Option<mpsc::Receiver<ProgressUpdate>> {
+        self.progress_rx.take()
+    }
+
+    /// Configure the Python executable path.
+    pub fn with_python_path(mut self, path: impl Into<String>) -> Self {
+        self.python_path = path.into();
+        self
+    }
+
+    /// Configure the sidecar module name.
+    pub fn with_sidecar_module(mut self, module: impl Into<String>) -> Self {
+        self.sidecar_module = module.into();
+        self
+    }
+
+    /// Start the sidecar process.
+    pub async fn start(&mut self) -> Result<()> {
+        if self.child.is_some() {
+            return Ok(()); // Already running
+        }
+
+        info!(python = %self.python_path, module = %self.sidecar_module, "Starting Python sidecar");
+
+        let mut child = Command::new(&self.python_path)
+            .arg("-m")
+            .arg(&self.sidecar_module)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit()) // Log to console
+            .kill_on_drop(true)
+            .spawn()?;
+
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow!("Failed to get stdin"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow!("Failed to get stdout"))?;
+
+        self.stdin = Some(stdin);
+        self.child = Some(child);
+
+        // Spawn stdout reader task
+        let pending = self.pending.clone();
+        let progress_tx = self.progress_tx.clone();
+
+        tokio::spawn(async move {
+            let reader = BufReader::new(stdout);
+            let mut lines = reader.lines();
+
+            while let Ok(Some(line)) = lines.next_line().await {
+                debug!(line = %line, "Sidecar output");
+
+                match serde_json::from_str::<IpcResponse>(&line) {
+                    Ok(response) => {
+                        if let Some(progress) = response.progress {
+                            // Progress update
+                            let _ = progress_tx
+                                .send(ProgressUpdate {
+                                    request_id: response.id.clone(),
+                                    data: progress,
+                                })
+                                .await;
+                        } else {
+                            // Final response
+                            let mut pending = pending.lock().await;
+                            if let Some(tx) = pending.remove(&response.id) {
+                                let result = if let Some(err) = response.error {
+                                    Err(anyhow!("{}: {}", err.code, err.message))
+                                } else {
+                                    Ok(response.result.unwrap_or(serde_json::Value::Null))
+                                };
+                                let _ = tx.send(result);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!(error = %e, line = %line, "Failed to parse sidecar response");
+                    }
+                }
+            }
+
+            info!("Sidecar stdout closed");
+        });
+
+        // Health check
+        let health = self.request("health.ping", serde_json::json!({})).await?;
+        info!(response = ?health, "Sidecar health check passed");
+
+        Ok(())
+    }
+
+    /// Stop the sidecar process.
+    pub async fn stop(&mut self) -> Result<()> {
+        if let Some(mut child) = self.child.take() {
+            // Try graceful shutdown first
+            let _ = self
+                .request("lifecycle.shutdown", serde_json::json!({}))
+                .await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            // Force kill if still running
+            let _ = child.kill().await;
+            info!("Sidecar stopped");
+        }
+        self.stdin = None;
+        Ok(())
+    }
+
+    /// Send a request to the sidecar and await the response.
+    pub async fn request(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let id = Uuid::new_v4().to_string();
+        let (tx, rx) = oneshot::channel();
+
+        self.pending.lock().await.insert(id.clone(), tx);
+
+        let request = IpcRequest {
+            id: id.clone(),
+            method: method.to_string(),
+            params,
+        };
+        let mut line = serde_json::to_string(&request)?;
+        line.push('\n');
+
+        let stdin = self
+            .stdin
+            .as_mut()
+            .ok_or_else(|| anyhow!("Sidecar not started"))?;
+        stdin.write_all(line.as_bytes()).await?;
+        stdin.flush().await?;
+
+        // Wait for response with timeout
+        tokio::time::timeout(std::time::Duration::from_secs(300), rx)
+            .await
+            .map_err(|_| {
+                let pending = self.pending.clone();
+                let id = id.clone();
+                tokio::spawn(async move {
+                    pending.lock().await.remove(&id);
+                });
+                anyhow!("Sidecar request timed out after 300s: {method}")
+            })?
+            .map_err(|_| anyhow!("Sidecar response channel closed"))?
+    }
+
+    /// Check if the sidecar is running.
+    pub fn is_running(&self) -> bool {
+        self.child.is_some()
+    }
+}
+
+impl Default for SidecarHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}

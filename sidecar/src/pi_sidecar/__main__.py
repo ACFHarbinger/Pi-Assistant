@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 
 
 async def main():
+    """
+    Main entry point for the sidecar.
+    """
     logger.info("Pi-Assistant sidecar starting (version 0.1.0)")
 
     registry = ModelRegistry()
@@ -42,6 +45,15 @@ async def _handle_request(
     transport: NdjsonTransport,
     request: dict,
 ):
+    """
+    Handle a single request from the Rust core.
+    Args:
+        handler: The request handler.
+        transport: The transport layer.
+        request: The request to handle.
+    Returns:
+        None
+    """
     request_id = request.get("id", "unknown")
     method = request.get("method", "")
     params = request.get("params", {})

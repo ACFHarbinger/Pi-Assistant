@@ -2,8 +2,13 @@
 
 use tauri::Manager;
 
+pub mod agent;
 pub mod commands;
+pub mod ipc;
+pub mod memory;
+pub mod safety;
 pub mod state;
+pub mod tools;
 
 /// Initialize and run the Tauri application.
 pub fn run() {
