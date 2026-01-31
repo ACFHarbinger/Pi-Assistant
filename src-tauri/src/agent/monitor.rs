@@ -17,7 +17,7 @@ pub async fn spawn_agent_monitor(
     cmd_rx: Arc<Mutex<mpsc::Receiver<AgentCommand>>>,
     tool_registry: Arc<RwLock<ToolRegistry>>,
     memory: Arc<MemoryManager>,
-    sidecar: Arc<Mutex<SidecarHandle>>,
+    ml_sidecar: Arc<Mutex<SidecarHandle>>,
     permission_engine: Arc<Mutex<PermissionEngine>>,
     channel_manager: Arc<ChannelManager>,
 ) {
@@ -60,7 +60,7 @@ pub async fn spawn_agent_monitor(
                     state_tx.clone(),
                     tool_registry.clone(),
                     memory.clone(),
-                    sidecar.clone(),
+                    ml_sidecar.clone(),
                     permission_engine.clone(),
                 );
 
@@ -89,7 +89,7 @@ pub async fn spawn_agent_monitor(
                 } else {
                     info!("Received chat message while idle (provider: {:?}, model: {:?}), responding directly...", provider, model_id);
                     let state_tx = state_tx.clone();
-                    let sidecar = sidecar.clone();
+                    let sidecar = ml_sidecar.clone();
                     let tool_registry = tool_registry.clone();
                     let memory = memory.clone();
 
@@ -156,7 +156,7 @@ pub async fn spawn_agent_monitor(
                         "Received channel message ({}) from {} while idle, responding...",
                         channel, sender_id
                     );
-                    let sidecar = sidecar.clone();
+                    let sidecar = ml_sidecar.clone();
                     let tool_registry = tool_registry.clone();
                     let memory = memory.clone();
                     let channel_manager = channel_manager.clone();

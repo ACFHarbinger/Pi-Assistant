@@ -286,7 +286,7 @@ pub async fn load_model(
     model_id: String,
     backend: Option<String>,
 ) -> Result<(), String> {
-    let mut sidecar = state.sidecar.lock().await;
+    let mut sidecar = state.ml_sidecar.lock().await;
     // Request sidecar to load model
     let _response = sidecar
         .request(
@@ -449,7 +449,7 @@ pub async fn save_telegram_config(
             let channel = Box::new(crate::channels::telegram::TelegramChannel::new(
                 token.clone(),
                 state.agent_cmd_tx.clone(),
-                state.sidecar.clone(),
+                state.logic_sidecar.clone(),
             ));
             // Set allowed users
             for user in &config.allowed_users {

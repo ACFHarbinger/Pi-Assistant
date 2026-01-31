@@ -13,11 +13,26 @@ pub async fn sidecar_request(
     tracing::debug!("Sidecar request: method={}, params={}", method, params);
 
     // Dispatch to sidecar
-    let mut sidecar = state.sidecar.lock().await;
-    let result = sidecar
-        .request(&method, params)
-        .await
-        .map_err(|e| format!("Sidecar request failed: {}", e))?;
+    // Logic Sidecar handles: "health.", "personality.", "lifecycle."
+    // ML Sidecar handles: "inference.", "model.", "training.", "voice."
 
-    Ok(result)
+    let is_logic = method.starts_with("health.")
+        || method.starts_with("personality.")
+        || method.starts_with("lifecycle.");
+
+    if is_logic {
+        let mut sidecar = state.logic_sidecar.lock().await;
+        let result = sidecar
+            .request(&method, params)
+            .await
+            .map_err(|e| format!("Logic Sidecar request failed: {}", e))?;
+        Ok(result)
+    } else {
+        let mut sidecar = state.ml_sidecar.lock().await;
+        let result = sidecar
+            .request(&method, params)
+            .await
+            .map_err(|e| format!("ML Sidecar request failed: {}", e))?;
+        Ok(result)
+    }
 }

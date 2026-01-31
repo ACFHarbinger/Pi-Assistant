@@ -20,7 +20,8 @@ pub struct AppState {
     pub tool_registry: Arc<RwLock<ToolRegistry>>,
     pub permissions: Arc<Mutex<PermissionEngine>>,
     pub memory: Arc<MemoryManager>,
-    pub sidecar: Arc<Mutex<SidecarHandle>>,
+    pub ml_sidecar: Arc<Mutex<SidecarHandle>>,
+    pub logic_sidecar: Arc<Mutex<SidecarHandle>>,
     pub channel_manager: Arc<ChannelManager>,
     pub cron_manager: Arc<CronManager>,
     pub voice_manager: Arc<Mutex<crate::voice::VoiceManager>>,
@@ -38,14 +39,27 @@ impl AppState {
 
         let memory = MemoryManager::new(None).expect("Failed to initialize memory");
 
-        let sidecar = Arc::new(Mutex::new(SidecarHandle::new()));
+        let ml_sidecar = Arc::new(Mutex::new(
+            SidecarHandle::new()
+                .with_sidecar_dir("ml")
+                .with_sidecar_module("pi_sidecar.ml.ml_sidecar_main"),
+        ));
+        let logic_sidecar = Arc::new(Mutex::new(
+            SidecarHandle::new()
+                .with_sidecar_dir("logic")
+                .with_sidecar_module("pi_sidecar.logic_main"),
+        ));
 
         let cron_manager = CronManager::new(&config_dir, agent_cmd_tx.clone())
             .await
             .expect("Failed to initialize cron manager");
         let cron_manager_arc = Arc::new(cron_manager);
 
-        let mut tool_registry = ToolRegistry::new(sidecar.clone(), cron_manager_arc.clone());
+        let mut tool_registry = ToolRegistry::new(
+            ml_sidecar.clone(),
+            logic_sidecar.clone(),
+            cron_manager_arc.clone(),
+        );
         if let Err(e) = tool_registry.load_mcp_tools().await {
             tracing::warn!("Failed to load MCP tools: {}", e);
         }
@@ -79,7 +93,8 @@ impl AppState {
             tool_registry: Arc::new(RwLock::new(tool_registry)),
             permissions: Arc::new(Mutex::new(PermissionEngine::new())),
             memory: Arc::new(memory),
-            sidecar,
+            ml_sidecar,
+            logic_sidecar,
             channel_manager: Arc::new(ChannelManager::new()),
             cron_manager: cron_manager_arc,
             voice_manager: voice_manager_arc,

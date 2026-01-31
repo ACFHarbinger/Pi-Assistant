@@ -50,7 +50,7 @@ pub async fn push_to_talk_stop(state: State<'_, AppState>) -> Result<String, Str
 
     // 2. Transcribe via sidecar STT
     let transcription = {
-        let mut sidecar = state.sidecar.lock().await;
+        let mut sidecar = state.ml_sidecar.lock().await;
         match sidecar
             .request(
                 "voice.transcribe",

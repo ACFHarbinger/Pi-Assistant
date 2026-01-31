@@ -34,7 +34,7 @@ pub struct TelegramChannel {
     /// Shutdown signal sender
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
     /// Sidecar handle for voice transcription
-    sidecar: Arc<Mutex<SidecarHandle>>,
+    ml_sidecar: Arc<Mutex<SidecarHandle>>,
     /// Media download directory
     media_dir: PathBuf,
 }
@@ -44,7 +44,7 @@ impl TelegramChannel {
     pub fn new(
         token: String,
         message_tx: mpsc::Sender<AgentCommand>,
-        sidecar: Arc<Mutex<SidecarHandle>>,
+        ml_sidecar: Arc<Mutex<SidecarHandle>>,
     ) -> Self {
         let media_dir = dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
@@ -58,7 +58,7 @@ impl TelegramChannel {
             running: Arc::new(AtomicBool::new(false)),
             message_tx,
             shutdown_tx: Arc::new(Mutex::new(None)),
-            sidecar,
+            ml_sidecar,
             media_dir,
         }
     }
@@ -73,7 +73,12 @@ impl TelegramChannel {
     }
 
     /// Download a file from Telegram by file_id to the media directory.
-    async fn download_file(bot: &Bot, file_id: &str, media_dir: &PathBuf, ext: &str) -> Option<PathBuf> {
+    async fn download_file(
+        bot: &Bot,
+        file_id: &str,
+        media_dir: &PathBuf,
+        ext: &str,
+    ) -> Option<PathBuf> {
         // Ensure media dir exists
         if let Err(e) = tokio::fs::create_dir_all(media_dir).await {
             error!("Failed to create media directory: {}", e);
@@ -88,7 +93,12 @@ impl TelegramChannel {
             }
         };
 
-        let file_name = format!("{}_{}.{}", chrono_timestamp(), &file_id[..8.min(file_id.len())], ext);
+        let file_name = format!(
+            "{}_{}.{}",
+            chrono_timestamp(),
+            &file_id[..8.min(file_id.len())],
+            ext
+        );
         let dest_path = media_dir.join(&file_name);
 
         let mut dest_file = match tokio::fs::File::create(&dest_path).await {
@@ -110,7 +120,10 @@ impl TelegramChannel {
     }
 
     /// Transcribe an audio file using the sidecar STT.
-    async fn transcribe_audio(sidecar: &Arc<Mutex<SidecarHandle>>, audio_path: &str) -> Option<String> {
+    async fn transcribe_audio(
+        sidecar: &Arc<Mutex<SidecarHandle>>,
+        audio_path: &str,
+    ) -> Option<String> {
         let mut sidecar = sidecar.lock().await;
         match sidecar
             .request(
@@ -140,7 +153,7 @@ impl TelegramChannel {
         msg: Message,
         allowed_users: Arc<RwLock<Vec<u64>>>,
         message_tx: mpsc::Sender<AgentCommand>,
-        sidecar: Arc<Mutex<SidecarHandle>>,
+        ml_sidecar: Arc<Mutex<SidecarHandle>>,
         media_dir: PathBuf,
     ) -> ResponseResult<()> {
         // Get sender info
@@ -198,7 +211,7 @@ impl TelegramChannel {
                 let path_str = path.to_string_lossy().to_string();
 
                 // Transcribe the voice message
-                if let Some(transcription) = Self::transcribe_audio(&sidecar, &path_str).await {
+                if let Some(transcription) = Self::transcribe_audio(&ml_sidecar, &path_str).await {
                     text = format!("[Voice message]: {}", transcription);
                 } else {
                     text = "[Voice message]: (transcription failed)".to_string();
@@ -225,7 +238,7 @@ impl TelegramChannel {
                 let path_str = path.to_string_lossy().to_string();
 
                 // Transcribe the audio
-                if let Some(transcription) = Self::transcribe_audio(&sidecar, &path_str).await {
+                if let Some(transcription) = Self::transcribe_audio(&ml_sidecar, &path_str).await {
                     if text.is_empty() {
                         text = format!("[Audio message]: {}", transcription);
                     } else {
@@ -257,7 +270,9 @@ impl TelegramChannel {
         // Photo (take the largest resolution)
         if let Some(photos) = msg.photo() {
             if let Some(photo) = photos.last() {
-                if let Some(path) = Self::download_file(&bot, &photo.file.id, &media_dir, "jpg").await {
+                if let Some(path) =
+                    Self::download_file(&bot, &photo.file.id, &media_dir, "jpg").await
+                {
                     let path_str = path.to_string_lossy().to_string();
 
                     if text.is_empty() {
@@ -368,7 +383,7 @@ impl Channel for TelegramChannel {
         let allowed_users = self.allowed_users.clone();
         let message_tx = self.message_tx.clone();
         let running = self.running.clone();
-        let sidecar = self.sidecar.clone();
+        let ml_sidecar = self.ml_sidecar.clone();
         let media_dir = self.media_dir.clone();
 
         // Create shutdown channel
@@ -379,15 +394,13 @@ impl Channel for TelegramChannel {
 
         // Spawn the bot listener
         tokio::spawn(async move {
-            let handler = Update::filter_message().endpoint(
-                move |bot: Bot, msg: Message| {
-                    let allowed = allowed_users.clone();
-                    let tx = message_tx.clone();
-                    let sc = sidecar.clone();
-                    let md = media_dir.clone();
-                    async move { Self::handle_message(bot, msg, allowed, tx, sc, md).await }
-                },
-            );
+            let handler = Update::filter_message().endpoint(move |bot: Bot, msg: Message| {
+                let allowed = allowed_users.clone();
+                let tx = message_tx.clone();
+                let sc = ml_sidecar.clone();
+                let md = media_dir.clone();
+                async move { Self::handle_message(bot, msg, allowed, tx, sc, md).await }
+            });
 
             let mut dispatcher = Dispatcher::builder(bot, handler)
                 .enable_ctrlc_handler()

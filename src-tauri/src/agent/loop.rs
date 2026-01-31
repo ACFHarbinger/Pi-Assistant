@@ -46,7 +46,7 @@ pub fn spawn_agent_loop(
     state_tx: watch::Sender<AgentState>,
     tool_registry: Arc<RwLock<ToolRegistry>>,
     memory: Arc<MemoryManager>,
-    sidecar: Arc<Mutex<SidecarHandle>>,
+    ml_sidecar: Arc<Mutex<SidecarHandle>>,
     permission_engine: Arc<Mutex<PermissionEngine>>,
 ) -> AgentLoopHandle {
     let cancel_token = CancellationToken::new();
@@ -60,7 +60,7 @@ pub fn spawn_agent_loop(
             cmd_rx,
             tool_registry,
             memory,
-            sidecar,
+            ml_sidecar,
             permission_engine,
             token,
         )
@@ -80,7 +80,7 @@ async fn agent_loop(
     mut cmd_rx: mpsc::Receiver<AgentCommand>,
     tool_registry: Arc<RwLock<ToolRegistry>>,
     memory: Arc<MemoryManager>,
-    sidecar: Arc<Mutex<SidecarHandle>>,
+    ml_sidecar: Arc<Mutex<SidecarHandle>>,
     permission_engine: Arc<Mutex<PermissionEngine>>,
     cancel_token: CancellationToken,
 ) -> Result<StopReason> {
@@ -167,7 +167,7 @@ async fn agent_loop(
         // ── 2. Plan next step (LLM call via sidecar) ─────────────────
         let tools = tool_registry.read().await.list_tools();
         let plan = {
-            let mut sidecar = sidecar.lock().await;
+            let mut sidecar = ml_sidecar.lock().await;
             let response = sidecar
                 .request(
                     "inference.plan",

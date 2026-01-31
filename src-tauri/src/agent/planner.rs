@@ -20,18 +20,18 @@ pub struct AgentPlan {
 
 /// Agent planner that uses the Python sidecar for LLM inference.
 pub struct AgentPlanner {
-    sidecar: Arc<Mutex<SidecarHandle>>,
+    ml_sidecar: Arc<Mutex<SidecarHandle>>,
     tool_registry: Arc<RwLock<ToolRegistry>>,
 }
 
 impl AgentPlanner {
     /// Create a new planner.
     pub fn new(
-        sidecar: Arc<Mutex<SidecarHandle>>,
+        ml_sidecar: Arc<Mutex<SidecarHandle>>,
         tool_registry: Arc<RwLock<ToolRegistry>>,
     ) -> Self {
         Self {
-            sidecar,
+            ml_sidecar,
             tool_registry,
         }
     }
@@ -49,7 +49,7 @@ impl AgentPlanner {
 
         let tools = self.tool_registry.read().await.list_tools();
 
-        let mut sidecar = self.sidecar.lock().await;
+        let mut sidecar = self.ml_sidecar.lock().await;
         let response = sidecar
             .request(
                 "inference.plan",
@@ -84,7 +84,7 @@ impl AgentPlanner {
         model_id: Option<&str>,
         max_tokens: Option<u32>,
     ) -> Result<String> {
-        let mut sidecar = self.sidecar.lock().await;
+        let mut sidecar = self.ml_sidecar.lock().await;
         let response = sidecar
             .request(
                 "inference.complete",

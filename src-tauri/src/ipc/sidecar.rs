@@ -55,6 +55,7 @@ pub struct SidecarHandle {
     progress_tx: mpsc::Sender<ProgressUpdate>,
     progress_rx: Option<mpsc::Receiver<ProgressUpdate>>,
     python_path: String,
+    sidecar_dir: String,
     sidecar_module: String,
 }
 
@@ -69,6 +70,7 @@ impl SidecarHandle {
             progress_tx,
             progress_rx: Some(progress_rx),
             python_path: "python3".to_string(),
+            sidecar_dir: "sidecar".to_string(),
             sidecar_module: "pi_sidecar".to_string(),
         }
     }
@@ -84,6 +86,12 @@ impl SidecarHandle {
         self
     }
 
+    /// Configure the sidecar directory name.
+    pub fn with_sidecar_dir(mut self, dir: impl Into<String>) -> Self {
+        self.sidecar_dir = dir.into();
+        self
+    }
+
     /// Configure the sidecar module name.
     pub fn with_sidecar_module(mut self, module: impl Into<String>) -> Self {
         self.sidecar_module = module.into();
@@ -96,21 +104,25 @@ impl SidecarHandle {
             return Ok(()); // Already running
         }
 
-        info!(python = %self.python_path, module = %self.sidecar_module, "Starting Python sidecar");
+        info!(python = %self.python_path, dir = %self.sidecar_dir, module = %self.sidecar_module, "Starting Python sidecar");
 
-        // Resolve absolute path to sidecar source for development
+        // Resolve absolute paths for development
         let cwd = std::env::current_dir().unwrap_or_default();
-        let sidecar_base = if cwd.join("sidecar").exists() {
-            cwd.join("sidecar")
-        } else if cwd.join("../sidecar").exists() {
-            cwd.join("../sidecar")
+        let sidecars_root = if cwd.join("sidecars").exists() {
+            cwd.join("sidecars")
+        } else if cwd.join("../sidecars").exists() {
+            cwd.join("../sidecars")
         } else {
-            cwd.join("../sidecar") // Fallback
+            cwd.join("../sidecars") // Fallback
         };
 
-        let sidecar_src = sidecar_base.join("src");
+        let sidecar_base = sidecars_root.join(&self.sidecar_dir);
+        let shared_base = sidecars_root.join("shared");
 
-        // Detect venv python
+        let sidecar_src = sidecar_base.join("src");
+        let shared_src = shared_base.join("src");
+
+        // Detect venv python (relative to sidecar_base)
         let venv_python = sidecar_base.join(".venv/bin/python");
         if venv_python.exists() {
             info!("Using venv python: {:?}", venv_python);
@@ -119,12 +131,19 @@ impl SidecarHandle {
             info!("Using system python: {}", self.python_path);
         }
 
-        info!("Setting PYTHONPATH to: {:?}", sidecar_src);
+        // Combine PYTHONPATH
+        let python_path = format!(
+            "{}:{}",
+            sidecar_src.to_string_lossy(),
+            shared_src.to_string_lossy()
+        );
+
+        info!("Setting PYTHONPATH to: {}", python_path);
 
         let mut child = Command::new(&self.python_path)
             .arg("-m")
             .arg(&self.sidecar_module)
-            .env("PYTHONPATH", sidecar_src)
+            .env("PYTHONPATH", python_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit()) // Log to console

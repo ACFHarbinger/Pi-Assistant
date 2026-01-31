@@ -33,7 +33,7 @@ pub fn run() {
         .setup(|app| {
             tauri::async_runtime::block_on(async {
                 let state = state::AppState::new().await;
-                let sidecar = state.sidecar.clone();
+                let ml_sidecar = state.ml_sidecar.clone();
                 let tool_registry = state.tool_registry.clone();
                 let memory = state.memory.clone();
                 let permissions = state.permissions.clone();
@@ -47,7 +47,7 @@ pub fn run() {
                         agent_cmd_rx,
                         tool_registry,
                         memory,
-                        sidecar,
+                        ml_sidecar,
                         permissions,
                         channel_manager,
                     )
@@ -90,7 +90,7 @@ pub fn run() {
                                     Box::new(crate::channels::telegram::TelegramChannel::new(
                                         token,
                                         state.agent_cmd_tx.clone(),
-                                        state.sidecar.clone(),
+                                        state.ml_sidecar.clone(),
                                     ));
                                 for user in tg_config.allowed_users {
                                     channel.allow_user(user).await;
