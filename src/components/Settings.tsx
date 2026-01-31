@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
 
 export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'auth' | 'marketplace' | 'reset'>('mcp');
+    const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'auth' | 'channels' | 'marketplace' | 'reset'>('mcp');
     const [mcpConfig, setMcpConfig] = useState<any>({});
     const [toolsConfig, setToolsConfig] = useState<any>({});
     const [modelsConfig, setModelsConfig] = useState<any>({ models: [] });
@@ -26,6 +26,8 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
         personality: true
     });
     const [isResetting, setIsResetting] = useState(false);
+    const [telegramConfig, setTelegramConfig] = useState<any>({ token: '', enabled: false, allowed_users: [] });
+    const [telegramLoading, setTelegramLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -41,6 +43,8 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
             setToolsConfig(tools);
             const models = await invoke('get_models_config');
             setModelsConfig(models);
+            const tg = await invoke('get_telegram_config');
+            setTelegramConfig(tg);
         } catch (e) {
             console.error('Failed to load config:', e);
         }
@@ -226,6 +230,7 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                     <TabButton active={activeTab === 'tools'} onClick={() => setActiveTab('tools')}>Tools</TabButton>
                     <TabButton active={activeTab === 'models'} onClick={() => setActiveTab('models')}>Models</TabButton>
                     <TabButton active={activeTab === 'auth'} onClick={() => setActiveTab('auth')}>Auth</TabButton>
+                    <TabButton active={activeTab === 'channels'} onClick={() => setActiveTab('channels')}>Channels</TabButton>
                     <TabButton active={activeTab === 'reset'} onClick={() => setActiveTab('reset')} className="text-red-500!">Reset</TabButton>
                 </div>
 
@@ -420,6 +425,114 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'channels' && (
+                        <div className="space-y-6">
+                            <h3 className="font-bold dark:text-white">Messaging Channels</h3>
+
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xl">✈️</span>
+                                        <div className="font-bold dark:text-white">Telegram Bot</div>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={telegramConfig.enabled}
+                                            onChange={async (e) => {
+                                                const newConfig = { ...telegramConfig, enabled: e.target.checked };
+                                                setTelegramConfig(newConfig);
+                                                try {
+                                                    await invoke('save_telegram_config', { config: newConfig });
+                                                } catch (err) {
+                                                    alert('Failed to toggle Telegram: ' + err);
+                                                    setTelegramConfig(telegramConfig);
+                                                }
+                                            }}
+                                        />
+                                        <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                    </label>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase">Bot Token</label>
+                                    <input
+                                        type="password"
+                                        placeholder="Enter bot token from @BotFather"
+                                        className="w-full p-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-sm dark:text-white"
+                                        value={telegramConfig.token || ''}
+                                        onChange={(e) => setTelegramConfig({ ...telegramConfig, token: e.target.value })}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase">Allowed User IDs (Whitelisted)</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            id="new-tg-user"
+                                            placeholder="Enter numeric ID..."
+                                            className="flex-1 p-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-sm dark:text-white"
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const input = document.getElementById('new-tg-user') as HTMLInputElement;
+                                                const id = parseInt(input.value);
+                                                if (id && !telegramConfig.allowed_users.includes(id)) {
+                                                    setTelegramConfig({
+                                                        ...telegramConfig,
+                                                        allowed_users: [...telegramConfig.allowed_users, id]
+                                                    });
+                                                    input.value = '';
+                                                }
+                                            }}
+                                            className="bg-blue-600 text-white px-3 rounded text-sm"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {telegramConfig.allowed_users.map((id: number) => (
+                                            <div key={id} className="bg-zinc-200 dark:bg-zinc-700 px-2 py-1 rounded text-xs flex items-center gap-2 dark:text-white">
+                                                {id}
+                                                <button
+                                                    onClick={() => setTelegramConfig({
+                                                        ...telegramConfig,
+                                                        allowed_users: telegramConfig.allowed_users.filter((u: number) => u !== id)
+                                                    })}
+                                                    className="text-red-500 font-bold"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {telegramConfig.allowed_users.length === 0 && (
+                                            <span className="text-xs text-zinc-500 italic">Empty = allow all users (CAUTION)</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <button
+                                    disabled={telegramLoading}
+                                    onClick={async () => {
+                                        setTelegramLoading(true);
+                                        try {
+                                            await invoke('save_telegram_config', { config: telegramConfig });
+                                            alert('Telegram configuration saved!');
+                                        } catch (err) {
+                                            alert('Failed to save config: ' + err);
+                                        } finally {
+                                            setTelegramLoading(false);
+                                        }
+                                    }}
+                                    className="w-full py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {telegramLoading ? 'Saving...' : 'Apply & Save Config'}
+                                </button>
                             </div>
                         </div>
                     )}

@@ -2,21 +2,11 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+
+from ..configs.model import LoadedModel
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class LoadedModel:
-    """A loaded model with its tokenizer."""
-
-    model_id: str
-    model: Any
-    tokenizer: Any
-    metadata: dict = field(default_factory=dict)
 
 
 class ModelRegistry:

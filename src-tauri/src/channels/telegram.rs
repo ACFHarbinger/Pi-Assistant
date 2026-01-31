@@ -9,7 +9,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use teloxide::prelude::*;
 use teloxide::types::{MessageId, ParseMode};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{error, info, warn};
 
 use super::{Channel, ChannelMessage, ChannelResponse};
@@ -23,20 +23,20 @@ pub struct TelegramChannel {
     /// Running state
     running: Arc<AtomicBool>,
     /// Message sender to forward messages to agent
-    message_tx: mpsc::Sender<ChannelMessage>,
+    message_tx: mpsc::Sender<AgentCommand>,
     /// Shutdown signal sender
-    shutdown_tx: Option<mpsc::Sender<()>>,
+    shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
 }
 
 impl TelegramChannel {
     /// Create a new Telegram channel.
-    pub fn new(token: String, message_tx: mpsc::Sender<ChannelMessage>) -> Self {
+    pub fn new(token: String, message_tx: mpsc::Sender<AgentCommand>) -> Self {
         Self {
             token,
             allowed_users: Arc::new(RwLock::new(Vec::new())),
             running: Arc::new(AtomicBool::new(false)),
             message_tx,
-            shutdown_tx: None,
+            shutdown_tx: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -60,7 +60,7 @@ impl TelegramChannel {
         bot: Bot,
         msg: Message,
         allowed_users: Arc<RwLock<Vec<u64>>>,
-        message_tx: mpsc::Sender<ChannelMessage>,
+        message_tx: mpsc::Sender<AgentCommand>,
     ) -> ResponseResult<()> {
         // Check if message has text
         let text = match msg.text() {
@@ -109,7 +109,17 @@ impl TelegramChannel {
         };
 
         // Forward to agent
-        if let Err(e) = message_tx.send(channel_msg).await {
+        if let Err(e) = message_tx
+            .send(AgentCommand::ChannelMessage {
+                id: channel_msg.id,
+                channel: channel_msg.channel,
+                sender_id: channel_msg.sender_id,
+                sender_name: channel_msg.sender_name,
+                text: channel_msg.text,
+                chat_id: channel_msg.chat_id,
+            })
+            .await
+        {
             error!("Failed to forward Telegram message: {}", e);
         }
 
@@ -136,7 +146,8 @@ impl Channel for TelegramChannel {
         let running = self.running.clone();
 
         // Create shutdown channel
-        let (_shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
+        let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
+        *self.shutdown_tx.lock().await = Some(shutdown_tx);
 
         running.store(true, Ordering::SeqCst);
 
@@ -173,8 +184,8 @@ impl Channel for TelegramChannel {
             return Ok(());
         }
 
-        if let Some(tx) = &self.shutdown_tx {
-            let _ = tx.send(()).await;
+        if let Some(tx) = self.shutdown_tx.lock().await.take() {
+            let _: Result<(), mpsc::error::SendError<()>> = tx.send(()).await;
         }
 
         self.running.store(false, Ordering::SeqCst);

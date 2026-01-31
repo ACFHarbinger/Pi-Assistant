@@ -5,7 +5,7 @@ interface HatchingExperienceProps {
     onComplete: () => void;
 }
 
-type WizardStep = 'welcome' | 'model' | 'api-key' | 'skills' | 'hatching';
+type WizardStep = 'welcome' | 'model' | 'api-key' | 'skills' | 'identity' | 'hatching';
 
 export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
     const [step, setStep] = useState<WizardStep>('welcome');
@@ -17,6 +17,7 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
         browser: true,
         files: true
     });
+    const [agentName, setAgentName] = useState('Pi');
     const [isLoading, setIsLoading] = useState(false);
     const [showAdvancedAuth, setShowAdvancedAuth] = useState(false);
     const [hatchMessages, setHatchMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
@@ -125,10 +126,25 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                 await invoke('toggle_tool', { name: 'shell', enabled: skills.shell });
                 await invoke('toggle_tool', { name: 'browser', enabled: skills.browser });
                 await invoke('toggle_tool', { name: 'filesystem', enabled: skills.files });
-                setStep('hatching');
+                setStep('identity');
             } catch (e) {
                 console.error('Failed to save skills:', e);
-                setStep('hatching'); // Proceed anyway
+                setStep('identity'); // Proceed anyway
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        else if (step === 'identity') {
+            setIsLoading(true);
+            try {
+                await invoke('sidecar_request', {
+                    method: 'personality.update_name',
+                    params: { name: agentName }
+                });
+                setStep('hatching');
+            } catch (e) {
+                console.error('Failed to update agent name:', e);
+                setStep('hatching');
             } finally {
                 setIsLoading(false);
             }
@@ -145,11 +161,11 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
             <div className={`transition-all duration-500 ${step === 'hatching' ? 'max-w-3xl' : 'max-w-xl'} w-full`}>
                 {/* Progress Indicators */}
                 <div className="flex justify-center gap-2 mb-12">
-                    {(['welcome', 'model', 'api-key', 'skills', 'hatching'] as WizardStep[]).map((s, i) => (
+                    {(['welcome', 'model', 'api-key', 'skills', 'identity', 'hatching'] as WizardStep[]).map((s, i) => (
                         <div
                             key={s}
                             className={`h-1.5 rounded-full transition-all duration-500 ${step === s ? 'w-8 bg-primary-500' :
-                                i < ['welcome', 'model', 'api-key', 'skills', 'hatching'].indexOf(step) ? 'w-4 bg-primary-800' : 'w-4 bg-gray-800'
+                                i < ['welcome', 'model', 'api-key', 'skills', 'identity', 'hatching'].indexOf(step) ? 'w-4 bg-primary-800' : 'w-4 bg-gray-800'
                                 }`}
                         />
                     ))}
@@ -384,6 +400,36 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                             >
                                 {isLoading ? 'Configuring...' : 'Finish Setup'}
                             </button>
+                        </div>
+                    )}
+
+                    {/* Identity Step */}
+                    {step === 'identity' && (
+                        <div className="space-y-6 text-center">
+                            <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-accent-500 rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-primary-500/20">
+                                <span className="text-4xl">🏷️</span>
+                            </div>
+                            <h2 className="text-2xl font-bold text-white">Name Your Agent</h2>
+                            <p className="text-sm text-gray-400">What would you like to call me?</p>
+
+                            <input
+                                type="text"
+                                value={agentName}
+                                onChange={(e) => setAgentName(e.target.value)}
+                                placeholder="Agent Name (e.g. Pi, Jarvis, Molty)"
+                                className="w-full p-4 bg-black/40 border border-white/10 rounded-xl text-white text-center text-xl font-bold focus:border-primary-500 outline-none transition-all"
+                            />
+
+                            <div className="flex gap-3 mt-4">
+                                <button onClick={() => setStep('skills')} className="flex-1 py-4 bg-gray-800 text-white rounded-xl">Back</button>
+                                <button
+                                    onClick={handleNext}
+                                    disabled={isLoading || !agentName.trim()}
+                                    className="flex-[2] py-4 bg-primary-600 hover:bg-primary-500 text-white font-bold rounded-xl transition-all disabled:opacity-50"
+                                >
+                                    {isLoading ? 'Saving...' : 'Confirm Name'}
+                                </button>
+                            </div>
                         </div>
                     )}
 

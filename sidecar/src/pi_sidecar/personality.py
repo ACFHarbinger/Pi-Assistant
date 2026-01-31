@@ -7,22 +7,9 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from .constants import DEFAULT_HATCHING_MESSAGE, DEFAULT_PERSONALITY
 
 logger = logging.getLogger(__name__)
-
-# Default hatching message if soul.md is not found
-DEFAULT_HATCHING_MESSAGE = """Hey! I'm Pi, your personal AI assistant. 🎉
-
-I run right here on your device—your conversations stay private, and I can help with all sorts of tasks:
-
-- **Code & Shell**: Write, debug, and run code  
-- **Files & Browser**: Read, edit files, and browse the web
-- **Memory**: Remember our conversations for context
-
-I'll ask before doing anything that could affect your system. Ready to get started?"""
-
-DEFAULT_PERSONALITY = """You are Pi, a friendly and helpful AI assistant.
-Be warm, curious, and concise. Use natural language and match the user's energy."""
 
 
 class Personality:
@@ -99,6 +86,36 @@ class Personality:
                 return "\n".join(hatching_lines)
         
         return DEFAULT_HATCHING_MESSAGE
+
+    @property
+    def name(self) -> str:
+        """Get the agent's name from soul.md."""
+        if self._soul_content:
+            # Find "You are **[Name]**"
+            import re
+            match = re.search(r"You are \*\*([^\*]+)\*\*", self._soul_content)
+            if match:
+                return match.group(1).strip()
+        return "Pi"
+
+    def update_name(self, name: str) -> bool:
+        """Update the agent's name in soul.md."""
+        soul_path = Path(self._workspace) / "soul.md"
+        if not soul_path.exists():
+            return False
+        
+        content = soul_path.read_text(encoding="utf-8")
+        import re
+        # Replace the first occurrence of "You are **[Name]**"
+        new_content = re.sub(r"You are \*\*([^\*]+)\*\*", f"You are **{name}**", content, count=1)
+        
+        try:
+            soul_path.write_text(new_content, encoding="utf-8")
+            self._soul_content = new_content
+            return True
+        except Exception as e:
+            logger.error("Failed to update agent name in soul.md: %s", e)
+            return False
 
     def reload(self) -> None:
         """Reload soul.md from disk."""

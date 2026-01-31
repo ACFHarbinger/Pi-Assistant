@@ -44,6 +44,8 @@ class RequestHandler:
             "inference.load_model": self._inference_load_model,
             "personality.get_hatching": self._personality_get_hatching,
             "personality.get_prompt": self._personality_get_prompt,
+            "personality.get_name": self._personality_get_name,
+            "personality.update_name": self._personality_update_name,
             "personality.hatch_chat": self._personality_hatch_chat,
             # Training handlers
             "training.start": self._training_start,
@@ -195,6 +197,27 @@ class RequestHandler:
         from pi_sidecar.personality import get_personality
         personality = get_personality()
         return {"prompt": personality.system_prompt}
+
+    async def _personality_get_name(self, params, _cb):
+        """
+        Get the agent's name from personality.
+        """
+        from pi_sidecar.personality import get_personality
+        personality = get_personality()
+        return {"name": personality.name}
+
+    async def _personality_update_name(self, params, _cb):
+        """
+        Update the agent's name in soul.md.
+        """
+        name = params.get("name")
+        if not name:
+             raise ValueError("Missing name")
+             
+        from pi_sidecar.personality import get_personality
+        personality = get_personality()
+        success = personality.update_name(name)
+        return {"success": success, "name": personality.name}
     async def _personality_hatch_chat(self, params, _cb):
         """
         Handle interactive hatching chat.

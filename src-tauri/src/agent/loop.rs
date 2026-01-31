@@ -114,7 +114,7 @@ async fn agent_loop(
         });
 
         // ── Check for incoming commands (non-blocking) ───────────────
-        if let Ok(cmd) = cmd_rx.try_recv() {
+        while let Ok(cmd) = cmd_rx.try_recv() {
             match cmd {
                 AgentCommand::Stop => {
                     let _ = state_tx.send(AgentState::Stopped {
@@ -150,6 +150,10 @@ async fn agent_loop(
                         task_id: task.id,
                         iteration,
                     });
+                }
+                AgentCommand::ChannelMessage { text, .. } => {
+                    // Store in memory so next iteration sees it
+                    let _ = memory.store_message(&task.session_id, "user", &text).await;
                 }
                 _ => {}
             }
@@ -284,6 +288,7 @@ async fn wait_for_answer(
             cmd = cmd_rx.recv() => {
                 match cmd {
                     Some(AgentCommand::AnswerQuestion { response }) => return Ok(response),
+                    Some(AgentCommand::ChannelMessage { text, .. }) => return Ok(text),
                     Some(AgentCommand::Stop) => anyhow::bail!("Stopped by user"),
                     _ => continue,
                 }

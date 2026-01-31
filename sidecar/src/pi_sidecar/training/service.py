@@ -10,37 +10,17 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from dataclasses import dataclass, field
+
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from ..configs import RunInfo
+from ..enums import RunStatus
+
 logger = logging.getLogger(__name__)
 
-__all__ = ["TrainingService", "RunStatus", "RunInfo"]
-
-
-class RunStatus(Enum):
-    """Status of a training run."""
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-@dataclass
-class RunInfo:
-    """Information about a training run."""
-    run_id: str
-    status: RunStatus
-    config: dict[str, Any]
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
-    metrics: dict[str, float] = field(default_factory=dict)
-    error: str | None = None
-    model_path: str | None = None
+__all__ = ["TrainingService"]
 
 
 class TrainingService:

@@ -1,4 +1,5 @@
 use crate::agent::r#loop::{spawn_agent_loop, AgentLoopHandle, AgentTask};
+use crate::channels::{ChannelManager, ChannelResponse};
 use crate::ipc::SidecarHandle;
 use crate::memory::MemoryManager;
 use crate::safety::PermissionEngine;
@@ -18,6 +19,7 @@ pub async fn spawn_agent_monitor(
     memory: Arc<MemoryManager>,
     sidecar: Arc<Mutex<SidecarHandle>>,
     permission_engine: Arc<Mutex<PermissionEngine>>,
+    channel_manager: Arc<ChannelManager>,
 ) {
     info!("Agent monitor task started");
 
@@ -124,6 +126,68 @@ pub async fn spawn_agent_monitor(
                         .cmd_tx
                         .send(AgentCommand::AnswerQuestion { response })
                         .await;
+                }
+            }
+            Some(AgentCommand::ChannelMessage {
+                id,
+                channel,
+                sender_id,
+                sender_name,
+                text,
+                chat_id,
+            }) => {
+                if let Some(ref handle) = current_loop {
+                    // Forward to running loop
+                    let _ = handle
+                        .cmd_tx
+                        .send(AgentCommand::ChannelMessage {
+                            id,
+                            channel,
+                            sender_id,
+                            sender_name,
+                            text,
+                            chat_id,
+                        })
+                        .await;
+                } else {
+                    info!(
+                        "Received channel message ({}) from {} while idle, responding...",
+                        channel, sender_id
+                    );
+                    let sidecar = sidecar.clone();
+                    let tool_registry = tool_registry.clone();
+                    let memory = memory.clone();
+                    let channel_manager = channel_manager.clone();
+
+                    tauri::async_runtime::spawn(async move {
+                        let planner =
+                            crate::agent::planner::AgentPlanner::new(sidecar, tool_registry);
+                        match planner.complete(&text, None, None, None).await {
+                            Ok(response) => {
+                                // Store message
+                                let session_id = Uuid::new_v4();
+                                let _ = memory.store_message(&session_id, "user", &text).await;
+                                let _ = memory
+                                    .store_message(&session_id, "assistant", &response)
+                                    .await;
+
+                                // Reply to channel
+                                let _ = channel_manager
+                                    .send_response(
+                                        &channel,
+                                        ChannelResponse {
+                                            chat_id,
+                                            text: response,
+                                            reply_to: Some(id),
+                                        },
+                                    )
+                                    .await;
+                            }
+                            Err(e) => {
+                                warn!("Failed to generate channel response: {}", e);
+                            }
+                        }
+                    });
                 }
             }
             Some(other) => {

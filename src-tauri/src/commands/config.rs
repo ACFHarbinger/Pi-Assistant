@@ -44,6 +44,13 @@ pub struct ResetOptions {
     pub personality: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+pub struct TelegramConfig {
+    pub token: Option<String>,
+    pub enabled: bool,
+    pub allowed_users: Vec<u64>,
+}
+
 // ── Helper: Config Paths ─────────────────────────────────────────────
 
 fn get_config_dir() -> Result<PathBuf> {
@@ -400,6 +407,61 @@ pub async fn save_current_model(model_id: String) -> Result<(), String> {
 
     let json = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
     fs::write(&path, json).await.map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_telegram_config() -> Result<TelegramConfig, String> {
+    let path = get_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("telegram.json");
+    if !path.exists() {
+        return Ok(TelegramConfig::default());
+    }
+    let content = fs::read_to_string(&path).await.map_err(|e| e.to_string())?;
+    serde_json::from_str(&content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn save_telegram_config(
+    state: tauri::State<'_, crate::state::AppState>,
+    config: TelegramConfig,
+) -> Result<(), String> {
+    let path = get_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("telegram.json");
+    let json = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&path, json).await.map_err(|e| e.to_string())?;
+
+    // If enabled, start/restart the channel
+    if config.enabled {
+        if let Some(token) = &config.token {
+            let mut channel_mgr = state.channel_manager.clone();
+            // We need to recreate the channel with the new token
+            let channel = Box::new(crate::channels::telegram::TelegramChannel::new(
+                token.clone(),
+                state.agent_cmd_tx.clone(),
+            ));
+            // Set allowed users
+            for user in &config.allowed_users {
+                channel.allow_user(*user).await;
+            }
+
+            state.channel_manager.add_channel(channel).await;
+            state
+                .channel_manager
+                .start_channel("telegram")
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+    } else {
+        state
+            .channel_manager
+            .stop_channel("telegram")
+            .await
+            .map_err(|e| e.to_string())?;
+    }
 
     Ok(())
 }

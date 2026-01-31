@@ -1,5 +1,6 @@
 //! Application state management.
 
+use crate::channels::ChannelManager;
 use crate::ipc::SidecarHandle;
 use crate::memory::MemoryManager;
 use crate::safety::PermissionEngine;
@@ -18,6 +19,7 @@ pub struct AppState {
     pub permissions: Arc<Mutex<PermissionEngine>>,
     pub memory: Arc<MemoryManager>,
     pub sidecar: Arc<Mutex<SidecarHandle>>,
+    pub channel_manager: Arc<ChannelManager>,
 }
 
 impl AppState {
@@ -37,12 +39,13 @@ impl AppState {
         Self {
             agent_state_tx,
             agent_state_rx,
-            agent_cmd_tx,
+            agent_cmd_tx: agent_cmd_tx.clone(),
             agent_cmd_rx: Arc::new(Mutex::new(agent_cmd_rx)),
             tool_registry: Arc::new(tool_registry),
             permissions: Arc::new(Mutex::new(PermissionEngine::new())),
             memory: Arc::new(memory),
             sidecar,
+            channel_manager: Arc::new(ChannelManager::new(agent_cmd_tx)),
         }
     }
 }

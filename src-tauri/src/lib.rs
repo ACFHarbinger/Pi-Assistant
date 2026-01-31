@@ -36,6 +36,7 @@ pub fn run() {
                 let permissions = state.permissions.clone();
                 let agent_cmd_rx = state.agent_cmd_rx.clone();
                 let agent_state_tx = state.agent_state_tx.clone();
+                let channel_manager = state.channel_manager.clone();
 
                 tauri::async_runtime::spawn(async move {
                     agent::spawn_agent_monitor(
@@ -45,6 +46,7 @@ pub fn run() {
                         memory,
                         sidecar,
                         permissions,
+                        channel_manager,
                     )
                     .await;
                 });
@@ -86,6 +88,8 @@ pub fn run() {
             commands::config::save_agent_name,
             commands::config::get_current_model,
             commands::config::save_current_model,
+            commands::config::get_telegram_config,
+            commands::config::save_telegram_config,
             commands::auth::start_oauth,
             commands::auth::exchange_oauth_code,
             commands::auth::start_claude_oauth,

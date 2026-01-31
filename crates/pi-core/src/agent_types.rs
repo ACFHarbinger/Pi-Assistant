@@ -76,6 +76,14 @@ pub enum AgentCommand {
         provider: Option<String>,
         model_id: Option<String>,
     },
+    ChannelMessage {
+        id: String,
+        channel: String,
+        sender_id: String,
+        sender_name: Option<String>,
+        text: String,
+        chat_id: String,
+    },
 }
 
 /// Plan returned by the LLM planner.

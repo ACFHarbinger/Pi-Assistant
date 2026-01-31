@@ -7,7 +7,10 @@
 pub mod telegram;
 
 use async_trait::async_trait;
+use pi_core::agent_types::AgentCommand;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 /// A message received from a channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,4 +61,70 @@ pub trait Channel: Send + Sync {
 
     /// Check if the channel is running.
     fn is_running(&self) -> bool;
+}
+
+/// Manages multiple communication channels.
+pub struct ChannelManager {
+    channels: Arc<RwLock<HashMap<String, Box<dyn Channel>>>>,
+    message_tx: mpsc::Sender<AgentCommand>,
+}
+
+use std::collections::HashMap;
+use tokio::sync::RwLock;
+
+impl ChannelManager {
+    /// Create a new channel manager.
+    pub fn new(message_tx: mpsc::Sender<AgentCommand>) -> Self {
+        Self {
+            channels: Arc::new(RwLock::new(HashMap::new())),
+            message_tx,
+        }
+    }
+
+    /// Add a channel.
+    pub async fn add_channel(&self, channel: Box<dyn Channel>) {
+        let mut channels = self.channels.write().await;
+        channels.insert(channel.name().to_string(), channel);
+    }
+
+    /// Start a channel.
+    pub async fn start_channel(&self, name: &str) -> anyhow::Result<()> {
+        let channels = self.channels.read().await;
+        if let Some(channel) = channels.get(name) {
+            channel.start().await?;
+        }
+        Ok(())
+    }
+
+    /// Stop a channel.
+    pub async fn stop_channel(&self, name: &str) -> anyhow::Result<()> {
+        let channels = self.channels.read().await;
+        if let Some(channel) = channels.get(name) {
+            channel.stop().await?;
+        }
+        Ok(())
+    }
+
+    /// Send a response to a channel.
+    pub async fn send_response(
+        &self,
+        channel_name: &str,
+        response: ChannelResponse,
+    ) -> anyhow::Result<()> {
+        let channels = self.channels.read().await;
+        if let Some(channel) = channels.get(channel_name) {
+            channel.send(response).await?;
+        }
+        Ok(())
+    }
+
+    /// Get channel status.
+    pub async fn is_running(&self, name: &str) -> bool {
+        let channels = self.channels.read().await;
+        if let Some(channel) = channels.get(name) {
+            channel.is_running()
+        } else {
+            false
+        }
+    }
 }
