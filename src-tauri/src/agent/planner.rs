@@ -6,7 +6,7 @@ use anyhow::Result;
 use pi_core::agent_types::ToolCall;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tracing::info;
 
 /// Plan returned by the LLM planner.
@@ -21,12 +21,15 @@ pub struct AgentPlan {
 /// Agent planner that uses the Python sidecar for LLM inference.
 pub struct AgentPlanner {
     sidecar: Arc<Mutex<SidecarHandle>>,
-    tool_registry: Arc<ToolRegistry>,
+    tool_registry: Arc<RwLock<ToolRegistry>>,
 }
 
 impl AgentPlanner {
     /// Create a new planner.
-    pub fn new(sidecar: Arc<Mutex<SidecarHandle>>, tool_registry: Arc<ToolRegistry>) -> Self {
+    pub fn new(
+        sidecar: Arc<Mutex<SidecarHandle>>,
+        tool_registry: Arc<RwLock<ToolRegistry>>,
+    ) -> Self {
         Self {
             sidecar,
             tool_registry,
@@ -44,7 +47,7 @@ impl AgentPlanner {
     ) -> Result<AgentPlan> {
         info!(task = task, iteration = iteration, "Generating plan");
 
-        let tools = self.tool_registry.list_tools();
+        let tools = self.tool_registry.read().await.list_tools();
 
         let mut sidecar = self.sidecar.lock().await;
         let response = sidecar

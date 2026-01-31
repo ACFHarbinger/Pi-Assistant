@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
-use crate::tools::{Tool, ToolResult};
+use crate::tools::{PermissionTier, Tool, ToolResult};
 
 /// Tool that allows the agent to push HTML/React to the canvas.
 pub struct CanvasTool {
@@ -74,7 +74,7 @@ impl Tool for CanvasTool {
         }
     }
 
-    fn permission_tier(&self) -> crate::safety::PermissionTier {
-        crate::safety::PermissionTier::Notify
+    fn permission_tier(&self) -> PermissionTier {
+        PermissionTier::Medium
     }
 }

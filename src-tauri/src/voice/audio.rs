@@ -4,8 +4,19 @@ use std::sync::{Arc, Mutex};
 use tracing::{error, info};
 
 pub struct AudioRecorder {
-    stream: Option<cpal::Stream>,
+    stream: Option<SendSafeStream>,
     buffer: Arc<Mutex<Vec<f32>>>,
+}
+
+struct SendSafeStream(cpal::Stream);
+unsafe impl Send for SendSafeStream {}
+unsafe impl Sync for SendSafeStream {}
+
+impl std::ops::Deref for SendSafeStream {
+    type Target = cpal::Stream;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl AudioRecorder {
@@ -55,7 +66,7 @@ impl AudioRecorder {
         };
 
         stream.play()?;
-        self.stream = Some(stream);
+        self.stream = Some(SendSafeStream(stream));
 
         Ok(())
     }

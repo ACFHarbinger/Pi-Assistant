@@ -46,7 +46,7 @@ impl WakeWordDetector {
         recognizer.set_max_alternatives(0);
         recognizer.set_words(true);
 
-        recognizer.accept_waveform(&i16_data);
+        let _ = recognizer.accept_waveform(&i16_data);
         let result = recognizer.final_result();
 
         // Simple heuristic for "Hey Pi" or "Pi"

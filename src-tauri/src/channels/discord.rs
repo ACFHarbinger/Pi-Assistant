@@ -10,26 +10,29 @@ use async_trait::async_trait;
 use serenity::all::{ChannelId, GatewayIntents, Message, Ready};
 use serenity::prelude::*;
 use tokio::sync::{mpsc, Mutex};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use super::{Channel, ChannelMessage, ChannelResponse};
 use pi_core::agent_types::AgentCommand;
 
 struct Handler {
     message_tx: mpsc::Sender<AgentCommand>,
+    bot_id: Mutex<Option<serenity::all::UserId>>,
 }
 
 #[async_trait]
 impl EventHandler for Handler {
-    async def message(&self, ctx: Context, msg: Message) {
+    async fn message(&self, _ctx: Context, msg: Message) {
         if msg.author.bot {
             return;
         }
 
         let is_dm = msg.guild_id.is_none();
-        
-        // Only respond if it's a DM or the bot is mentioned
-        let bot_user_id = ctx.cache.current_user().id;
+
+        let bot_user_id = {
+            let id = self.bot_id.lock().await;
+            id.unwrap_or(msg.author.id) // Fallback if not ready
+        };
         let is_mentioned = msg.mentions.iter().any(|u| u.id == bot_user_id);
 
         if !is_dm && !is_mentioned {
@@ -41,7 +44,11 @@ impl EventHandler for Handler {
         if is_mentioned {
             let mention = format!("<@{}>", bot_user_id);
             let mention_nickname = format!("<@!{}>", bot_user_id);
-            text = text.replace(&mention, "").replace(&mention_nickname, "").trim().to_string();
+            text = text
+                .replace(&mention, "")
+                .replace(&mention_nickname, "")
+                .trim()
+                .to_string();
         }
 
         // Create channel message
@@ -57,7 +64,8 @@ impl EventHandler for Handler {
         };
 
         // Forward to agent
-        if let Err(e) = self.message_tx
+        if let Err(e) = self
+            .message_tx
             .send(AgentCommand::ChannelMessage {
                 id: channel_msg.id,
                 channel: channel_msg.channel,
@@ -74,6 +82,7 @@ impl EventHandler for Handler {
 
     async fn ready(&self, _: Context, ready: Ready) {
         info!("Discord bot '{}' is connected!", ready.user.name);
+        *self.bot_id.lock().await = Some(ready.user.id);
     }
 }
 
@@ -120,6 +129,7 @@ impl Channel for DiscordChannel {
 
         let handler = Handler {
             message_tx: self.message_tx.clone(),
+            bot_id: Mutex::new(None),
         };
 
         let mut client = Client::builder(&self.token, intents)
@@ -129,7 +139,7 @@ impl Channel for DiscordChannel {
 
         let shard_manager = client.shard_manager.clone();
         *self.shard_manager.lock().await = Some(shard_manager);
-        
+
         let running = self.running.clone();
         running.store(true, Ordering::SeqCst);
 

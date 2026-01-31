@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use tauri::State;
-use tracing::{error, info};
+use tracing::info;
 
 #[tauri::command]
 pub async fn start_voice_listener(state: State<'_, AppState>) -> Result<(), String> {

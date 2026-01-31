@@ -6,7 +6,7 @@ use crate::voice::wake::WakeWordDetector;
 use pi_core::agent_types::AgentCommand;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::{error, info};
+use tracing::info;
 
 pub struct VoiceManager {
     recorder: Arc<tokio::sync::Mutex<AudioRecorder>>,

@@ -11,8 +11,7 @@ use pi_core::agent_types::{AgentCommand, AgentState};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch, Mutex, RwLock};
-use tracing::{info, warn};
-use uuid::Uuid;
+use tracing::info;
 
 /// Configuration for channel-to-agent routing.
 #[derive(Debug, Clone, Default)]
@@ -58,7 +57,7 @@ pub struct AgentPool {
     memory: Arc<MemoryManager>,
     sidecar: Arc<Mutex<SidecarHandle>>,
     permission_engine: Arc<Mutex<PermissionEngine>>,
-    channel_manager: Arc<ChannelManager>,
+    _channel_manager: Arc<ChannelManager>,
 }
 
 impl AgentPool {
@@ -76,7 +75,7 @@ impl AgentPool {
             memory,
             sidecar,
             permission_engine,
-            channel_manager,
+            _channel_manager: channel_manager,
         }
     }
 
@@ -175,11 +174,10 @@ impl AgentPool {
             }
         }
 
-        let tool_registry = self.tool_registry.read().await;
         let handle = spawn_agent_loop(
             task,
             agent.state_tx.clone(),
-            Arc::new((*tool_registry).clone()),
+            self.tool_registry.clone(),
             self.memory.clone(),
             self.sidecar.clone(),
             self.permission_engine.clone(),

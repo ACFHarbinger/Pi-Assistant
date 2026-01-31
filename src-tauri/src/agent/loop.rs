@@ -9,7 +9,7 @@ use pi_core::agent_types::{AgentCommand, AgentState, PermissionRequest, StopReas
 use anyhow::Result;
 use serde::Deserialize;
 use std::sync::Arc;
-use tokio::sync::{mpsc, watch, Mutex};
+use tokio::sync::{mpsc, watch, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -44,7 +44,7 @@ pub struct AgentPlan {
 pub fn spawn_agent_loop(
     task: AgentTask,
     state_tx: watch::Sender<AgentState>,
-    tool_registry: Arc<ToolRegistry>,
+    tool_registry: Arc<RwLock<ToolRegistry>>,
     memory: Arc<MemoryManager>,
     sidecar: Arc<Mutex<SidecarHandle>>,
     permission_engine: Arc<Mutex<PermissionEngine>>,
@@ -78,7 +78,7 @@ async fn agent_loop(
     task: AgentTask,
     state_tx: watch::Sender<AgentState>,
     mut cmd_rx: mpsc::Receiver<AgentCommand>,
-    tool_registry: Arc<ToolRegistry>,
+    tool_registry: Arc<RwLock<ToolRegistry>>,
     memory: Arc<MemoryManager>,
     sidecar: Arc<Mutex<SidecarHandle>>,
     permission_engine: Arc<Mutex<PermissionEngine>>,
@@ -165,6 +165,7 @@ async fn agent_loop(
             .await?;
 
         // ── 2. Plan next step (LLM call via sidecar) ─────────────────
+        let tools = tool_registry.read().await.list_tools();
         let plan = {
             let mut sidecar = sidecar.lock().await;
             let response = sidecar
@@ -176,7 +177,7 @@ async fn agent_loop(
                         "context": context,
                         "provider": task.provider,
                         "model_id": task.model_id,
-                        "tools": tool_registry.list_tools(),
+                        "tools": tools,
                     }),
                 )
                 .await?;
@@ -256,7 +257,7 @@ async fn agent_loop(
                 }
             }
 
-            let result = tool_registry.execute(tool_call).await?;
+            let result = tool_registry.read().await.execute(tool_call).await?;
             memory
                 .store_tool_result(&task.id, tool_call, &result)
                 .await?;

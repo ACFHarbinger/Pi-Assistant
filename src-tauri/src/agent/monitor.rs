@@ -7,7 +7,7 @@ use crate::tools::ToolRegistry;
 use pi_core::agent_types::{AgentCommand, AgentState};
 
 use std::sync::Arc;
-use tokio::sync::{mpsc, watch, Mutex};
+use tokio::sync::{mpsc, watch, Mutex, RwLock};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -15,7 +15,7 @@ use uuid::Uuid;
 pub async fn spawn_agent_monitor(
     state_tx: watch::Sender<AgentState>,
     cmd_rx: Arc<Mutex<mpsc::Receiver<AgentCommand>>>,
-    tool_registry: Arc<ToolRegistry>,
+    tool_registry: Arc<RwLock<ToolRegistry>>,
     memory: Arc<MemoryManager>,
     sidecar: Arc<Mutex<SidecarHandle>>,
     permission_engine: Arc<Mutex<PermissionEngine>>,
