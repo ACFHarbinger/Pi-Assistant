@@ -1,0 +1,3 @@
+[submodule "sidecars/ml/src/pi_sidecar"]
+	path = sidecars/ml/src/pi_sidecar
+	url = https://github.com/ACFHarbinger/Machine-Learning-Zoo.git

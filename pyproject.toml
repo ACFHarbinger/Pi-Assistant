@@ -1,0 +1,24 @@
+[project]
+name = "pi-assistant-root"
+version = "0.1.0"
+description = "Root configuration for Pi-Assistant workspace"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.uv.workspace]
+members = ["sidecars/ml", "sidecars/logic", "sidecars/shared"]

@@ -42,7 +42,7 @@ impl AppState {
         let ml_sidecar = Arc::new(Mutex::new(
             SidecarHandle::new()
                 .with_sidecar_dir("ml")
-                .with_sidecar_module("pi_sidecar.ml.ml_sidecar_main"),
+                .with_sidecar_module("pi_sidecar.ml_sidecar_main"),
         ));
         let logic_sidecar = Arc::new(Mutex::new(
             SidecarHandle::new()
