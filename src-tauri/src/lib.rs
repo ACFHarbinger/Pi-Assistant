@@ -9,6 +9,7 @@ pub mod memory;
 pub mod safety;
 pub mod state;
 pub mod tools;
+pub mod ws;
 
 /// Initialize and run the Tauri application.
 pub fn run() {

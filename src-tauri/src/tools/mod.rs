@@ -1,5 +1,6 @@
 //! Tool system: registry, trait, and implementations.
 
+pub mod browser;
 pub mod code;
 pub mod shell;
 
