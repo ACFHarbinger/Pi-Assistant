@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
 
 export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'auth' | 'channels' | 'marketplace' | 'reset'>('mcp');
+    const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'auth' | 'channels' | 'agents' | 'marketplace' | 'reset'>('mcp');
     const [mcpConfig, setMcpConfig] = useState<any>({});
     const [toolsConfig, setToolsConfig] = useState<any>({});
     const [modelsConfig, setModelsConfig] = useState<any>({ models: [] });
@@ -236,6 +236,7 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                     <TabButton active={activeTab === 'models'} onClick={() => setActiveTab('models')}>Models</TabButton>
                     <TabButton active={activeTab === 'auth'} onClick={() => setActiveTab('auth')}>Auth</TabButton>
                     <TabButton active={activeTab === 'channels'} onClick={() => setActiveTab('channels')}>Channels</TabButton>
+                    <TabButton active={activeTab === 'agents'} onClick={() => setActiveTab('agents')}>Agents</TabButton>
                     <TabButton active={activeTab === 'reset'} onClick={() => setActiveTab('reset')} className="text-red-500!">Reset</TabButton>
                 </div>
 
@@ -617,6 +618,45 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                                 >
                                     {discordLoading ? 'Saving...' : 'Apply & Save Config'}
                                 </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'agents' && (
+                        <div className="space-y-6">
+                            <h3 className="font-bold dark:text-white">Multi-Agent Routing</h3>
+                            <p className="text-sm text-zinc-500">
+                                Create multiple agent instances and route messaging channels to specific agents.
+                            </p>
+
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded border border-zinc-200 dark:border-zinc-700 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-medium dark:text-white">🤖 Default Agent</span>
+                                    <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-1 rounded">Active</span>
+                                </div>
+                                <div className="text-xs text-zinc-500">
+                                    The default agent handles all unrouted channels and direct messages.
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                                <h4 className="font-medium mb-3 dark:text-white">Channel Routing</h4>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-800 rounded">
+                                        <span className="dark:text-white">✈️ Telegram</span>
+                                        <span className="text-zinc-500">→ Default Agent</span>
+                                    </div>
+                                    <div className="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-800 rounded">
+                                        <span className="dark:text-white">💬 Discord</span>
+                                        <span className="text-zinc-500">→ Default Agent</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                <p className="text-sm text-blue-700 dark:text-blue-300">
+                                    💡 <strong>Coming Soon:</strong> Use the <code>sessions</code> tool to create additional agents and configure routing dynamically.
+                                </p>
                             </div>
                         </div>
                     )}

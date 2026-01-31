@@ -1,8 +1,10 @@
 //! Tool system: registry, trait, and implementations.
 
 pub mod browser;
+pub mod canvas;
 pub mod code;
 pub mod cron;
+pub mod sessions;
 pub mod shell;
 pub mod training;
 
@@ -105,6 +107,11 @@ impl ToolRegistry {
         registry.register(Arc::new(cron::CronTool::new(cron_manager)));
 
         registry
+    }
+
+    /// Register the canvas tool (requires AppHandle).
+    pub fn register_canvas_tool(&mut self, app_handle: tauri::AppHandle) {
+        self.register(Arc::new(canvas::CanvasTool::new(app_handle)));
     }
 
     /// Register a tool.

@@ -5,6 +5,7 @@ use crate::cron::CronManager;
 use crate::ipc::SidecarHandle;
 use crate::memory::MemoryManager;
 use crate::safety::PermissionEngine;
+use crate::skills::SkillManager;
 use crate::tools::ToolRegistry;
 use pi_core::agent_types::{AgentCommand, AgentState};
 use std::sync::Arc;
@@ -23,6 +24,7 @@ pub struct AppState {
     pub channel_manager: Arc<ChannelManager>,
     pub cron_manager: Arc<CronManager>,
     pub voice_manager: Arc<Mutex<crate::voice::VoiceManager>>,
+    pub skill_manager: Arc<tokio::sync::RwLock<SkillManager>>,
 }
 
 impl AppState {
@@ -55,6 +57,20 @@ impl AppState {
         }
         let voice_manager_arc = Arc::new(Mutex::new(voice_manager));
 
+        // Load skills from workspace and global paths
+        let mut skill_manager = SkillManager::new();
+        let skill_paths = vec![
+            std::env::current_dir()
+                .unwrap_or_default()
+                .join(".agent")
+                .join("skills"),
+            config_dir.join("skills"),
+        ];
+        if let Err(e) = skill_manager.load_from_paths(&skill_paths).await {
+            tracing::warn!("Failed to load skills: {}", e);
+        }
+        let skill_manager_arc = Arc::new(tokio::sync::RwLock::new(skill_manager));
+
         Self {
             agent_state_tx,
             agent_state_rx,
@@ -67,6 +83,7 @@ impl AppState {
             channel_manager: Arc::new(ChannelManager::new()),
             cron_manager: cron_manager_arc,
             voice_manager: voice_manager_arc,
+            skill_manager: skill_manager_arc,
         }
     }
 }

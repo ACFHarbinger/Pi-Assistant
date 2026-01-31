@@ -5,6 +5,7 @@ import { TaskInput } from "./components/TaskInput.tsx";
 import { PermissionDialog } from "./components/PermissionDialog.tsx";
 import { HatchingExperience } from "./components/HatchingExperience.tsx";
 import { VoicePanel } from "./components/VoicePanel";
+import { Canvas } from "./components/Canvas";
 
 import Settings from "./components/Settings";
 import { useState, useEffect } from "react";
@@ -12,6 +13,7 @@ import { useState, useEffect } from "react";
 function App() {
     const { state, setupListeners } = useAgentStore();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isCanvasOpen, setIsCanvasOpen] = useState(false);
     const [isHatched, setIsHatched] = useState<boolean | null>(null);
 
     // Initialize listeners
@@ -66,6 +68,13 @@ function App() {
                     <div className="flex items-center gap-4">
                         <AgentStatus />
                         <button
+                            onClick={() => setIsCanvasOpen(!isCanvasOpen)}
+                            className={`p-2 transition-colors ${isCanvasOpen ? 'text-primary-400' : 'text-gray-400 hover:text-white'}`}
+                            title="Live Canvas"
+                        >
+                            🎨
+                        </button>
+                        <button
                             onClick={() => setIsSettingsOpen(true)}
                             className="p-2 text-gray-400 hover:text-white transition-colors"
                             title="Settings"
@@ -116,6 +125,9 @@ function App() {
 
             {/* Voice Control Panel */}
             <VoicePanel />
+
+            {/* Live Canvas */}
+            <Canvas isOpen={isCanvasOpen} onClose={() => setIsCanvasOpen(false)} />
 
             {/* Settings Dialog */}
             <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />

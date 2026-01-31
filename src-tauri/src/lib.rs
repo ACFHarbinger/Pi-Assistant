@@ -11,6 +11,7 @@ pub mod ipc;
 pub mod mcp;
 pub mod memory;
 pub mod safety;
+pub mod skills;
 pub mod state;
 pub mod tools;
 pub mod voice;
@@ -52,6 +53,12 @@ pub fn run() {
                     )
                     .await;
                 });
+
+                // Register canvas tool (requires app handle)
+                {
+                    let mut registry = state.tool_registry.write().await;
+                    registry.register_canvas_tool(app.handle().clone());
+                }
 
                 // Bridge AgentState to Tauri events
                 let mut state_rx = state.agent_state_rx.clone();
