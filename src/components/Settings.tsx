@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
 
 export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'marketplace'>('mcp');
+    const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'marketplace' | 'reset'>('mcp');
     const [mcpConfig, setMcpConfig] = useState<any>({});
     const [toolsConfig, setToolsConfig] = useState<any>({});
     const [modelsConfig, setModelsConfig] = useState<any>({ models: [] });
@@ -16,6 +16,16 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
     const [newServerArgs, setNewServerArgs] = useState('');
 
     const [newModelId, setNewModelId] = useState('');
+
+    // Reset Options
+    const [resetOptions, setResetOptions] = useState({
+        memory: true,
+        mcp_config: false,
+        tools_config: false,
+        models_config: false,
+        personality: true
+    });
+    const [isResetting, setIsResetting] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -82,6 +92,31 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
         }
     }
 
+    async function handleReset() {
+        const count = Object.values(resetOptions).filter(Boolean).length;
+        if (count === 0) return;
+
+        const warning = `WARNING: This will permanently delete selected data segments (${count} selected). Are you absolutely sure?`;
+        if (!confirm(warning)) return;
+
+        setIsResetting(true);
+        try {
+            await invoke('reset_agent', { options: resetOptions });
+
+            if (resetOptions.personality) {
+                localStorage.removeItem('pi-hatched');
+            }
+
+            alert('Agent reset successful. The application will now reload.');
+            window.location.reload();
+        } catch (e) {
+            console.error('Reset failed:', e);
+            alert('Reset failed: ' + e);
+        } finally {
+            setIsResetting(false);
+        }
+    }
+
     // Marketplace Logic
     const [marketplaceItems, setMarketplaceItems] = useState<any[]>([]);
 
@@ -122,6 +157,7 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                     <TabButton active={activeTab === 'marketplace'} onClick={() => setActiveTab('marketplace')}>Marketplace</TabButton>
                     <TabButton active={activeTab === 'tools'} onClick={() => setActiveTab('tools')}>Tools</TabButton>
                     <TabButton active={activeTab === 'models'} onClick={() => setActiveTab('models')}>Models</TabButton>
+                    <TabButton active={activeTab === 'reset'} onClick={() => setActiveTab('reset')} className="text-red-500!">Reset</TabButton>
                 </div>
 
                 <div className="p-6 overflow-y-auto flex-1">
@@ -256,7 +292,79 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'reset' && (
+                        <div className="space-y-6">
+                            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                <h3 className="text-red-800 dark:text-red-400 font-bold mb-1">Danger Zone</h3>
+                                <p className="text-sm text-red-700 dark:text-red-300">
+                                    Resetting the agent will permanently delete the selected configurations and data. This action cannot be undone.
+                                </p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <ResetOption
+                                    label="Clear Memory & History"
+                                    description="Deletes all conversation logs and knowledge base (memory.db)"
+                                    checked={resetOptions.memory}
+                                    onChange={(v) => setResetOptions({ ...resetOptions, memory: v })}
+                                />
+                                <ResetOption
+                                    label="Reset Personality & Hatching"
+                                    description="Allows you to experience the 'hatching' sequence again"
+                                    checked={resetOptions.personality}
+                                    onChange={(v) => setResetOptions({ ...resetOptions, personality: v })}
+                                />
+                                <ResetOption
+                                    label="Reset MCP Servers"
+                                    description="Removes all installed MCP server configurations"
+                                    checked={resetOptions.mcp_config}
+                                    onChange={(v) => setResetOptions({ ...resetOptions, mcp_config: v })}
+                                />
+                                <ResetOption
+                                    label="Reset Skills/Tools"
+                                    description="Reverts tool enablement settings to defaults"
+                                    checked={resetOptions.tools_config}
+                                    onChange={(v) => setResetOptions({ ...resetOptions, tools_config: v })}
+                                />
+                                <ResetOption
+                                    label="Reset Model Config"
+                                    description="Removes custom added models from the list"
+                                    checked={resetOptions.models_config}
+                                    onChange={(v) => setResetOptions({ ...resetOptions, models_config: v })}
+                                />
+                            </div>
+
+                            <div className="pt-4">
+                                <button
+                                    onClick={handleReset}
+                                    disabled={isResetting || !Object.values(resetOptions).some(Boolean)}
+                                    className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:bg-zinc-400 text-white font-bold rounded-lg shadow transition-colors"
+                                >
+                                    {isResetting ? 'Resetting...' : 'Execute Reset'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function ResetOption({ label, description, checked, onChange }: { label: string, description: string, checked: boolean, onChange: (v: boolean) => void }) {
+    return (
+        <div className="flex items-start gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-colors cursor-pointer" onClick={() => onChange(!checked)}>
+            <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => onChange(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-600"
+                onClick={(e) => e.stopPropagation()}
+            />
+            <div className="flex-1">
+                <div className="text-sm font-medium dark:text-white leading-none">{label}</div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{description}</div>
             </div>
         </div>
     );

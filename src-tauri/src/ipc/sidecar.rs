@@ -100,21 +100,31 @@ impl SidecarHandle {
 
         // Resolve absolute path to sidecar source for development
         let cwd = std::env::current_dir().unwrap_or_default();
-        let sidecar_path = if cwd.join("sidecar/src").exists() {
-            cwd.join("sidecar/src")
-        } else if cwd.join("../sidecar/src").exists() {
-            cwd.join("../sidecar/src")
+        let sidecar_base = if cwd.join("sidecar").exists() {
+            cwd.join("sidecar")
+        } else if cwd.join("../sidecar").exists() {
+            cwd.join("../sidecar")
         } else {
-            // Fallback to relative
-            std::path::PathBuf::from("../sidecar/src")
+            cwd.join("../sidecar") // Fallback
         };
 
-        info!("Setting PYTHONPATH to: {:?}", sidecar_path);
+        let sidecar_src = sidecar_base.join("src");
+
+        // Detect venv python
+        let venv_python = sidecar_base.join(".venv/bin/python");
+        if venv_python.exists() {
+            info!("Using venv python: {:?}", venv_python);
+            self.python_path = venv_python.to_string_lossy().to_string();
+        } else {
+            info!("Using system python: {}", self.python_path);
+        }
+
+        info!("Setting PYTHONPATH to: {:?}", sidecar_src);
 
         let mut child = Command::new(&self.python_path)
             .arg("-m")
             .arg(&self.sidecar_module)
-            .env("PYTHONPATH", sidecar_path)
+            .env("PYTHONPATH", sidecar_src)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit()) // Log to console

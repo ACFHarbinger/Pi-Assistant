@@ -17,9 +17,9 @@ impl MemoryManager {
     /// Create a new memory manager with SQLite database.
     pub fn new(db_path: Option<PathBuf>) -> Result<Self> {
         let path = db_path.unwrap_or_else(|| {
-            dirs::data_dir()
+            dirs::home_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
-                .join("pi-assistant")
+                .join(".pi-assistant")
                 .join("memory.db")
         });
 

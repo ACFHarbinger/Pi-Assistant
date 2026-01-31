@@ -6,7 +6,6 @@ Loads soul.md and provides personality-aware system prompts.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -46,7 +45,7 @@ class Personality:
         # Try common locations
         candidates = [
             Path.home() / "Repositories" / "Pi-Assistant",
-            Path.home() / "pi-assistant",
+            Path.home() / ".pi-assistant",
             Path(__file__).parents[4],  # Navigate up from this module
         ]
         for candidate in candidates:

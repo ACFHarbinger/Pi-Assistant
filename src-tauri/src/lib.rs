@@ -51,6 +51,7 @@ pub fn run() {
             commands::config::save_model,
             commands::config::load_model,
             commands::config::get_mcp_marketplace,
+            commands::config::reset_agent,
             commands::sidecar::sidecar_request,
         ])
         .run(tauri::generate_context!())

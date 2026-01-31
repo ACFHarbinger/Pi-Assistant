@@ -21,7 +21,7 @@ impl McpConfig {
     pub async fn load() -> Result<Self> {
         let home_dir =
             dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
-        let config_dir = home_dir.join("pi-assistant");
+        let config_dir = home_dir.join(".pi-assistant");
         let config_path = config_dir.join("mcp_config.json");
 
         if !config_path.exists() {

@@ -34,11 +34,20 @@ pub struct McpMarketplaceItem {
     pub env_vars: Vec<String>, // Names of env vars to prompt for
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResetOptions {
+    pub memory: bool,
+    pub mcp_config: bool,
+    pub tools_config: bool,
+    pub models_config: bool,
+    pub personality: bool,
+}
+
 // ── Helper: Config Paths ─────────────────────────────────────────────
 
 fn get_config_dir() -> Result<PathBuf> {
     let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("No home dir"))?;
-    let dir = home.join("pi-assistant");
+    let dir = home.join(".pi-assistant");
     if !dir.exists() {
         std::fs::create_dir_all(&dir)?;
     }
@@ -246,6 +255,48 @@ pub async fn load_model(
         )
         .await
         .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+#[tauri::command]
+pub async fn reset_agent(options: ResetOptions) -> Result<(), String> {
+    let config_dir = get_config_dir().map_err(|e| e.to_string())?;
+
+    if options.memory {
+        let path = config_dir.join("memory.db");
+        if path.exists() {
+            fs::remove_file(path).await.map_err(|e| e.to_string())?;
+        }
+    }
+
+    if options.mcp_config {
+        let path = config_dir.join("mcp_config.json");
+        if path.exists() {
+            fs::remove_file(path).await.map_err(|e| e.to_string())?;
+        }
+    }
+
+    if options.tools_config {
+        let path = config_dir.join("tools_config.json");
+        if path.exists() {
+            fs::remove_file(path).await.map_err(|e| e.to_string())?;
+        }
+    }
+
+    if options.models_config {
+        let path = config_dir.join("models.json");
+        if path.exists() {
+            fs::remove_file(path).await.map_err(|e| e.to_string())?;
+        }
+    }
+
+    // Personality reset involves soul.md and potentially clearing sidecar cache
+    // For now, we'll just indicate personality reset is handled
+    // Actually, soul.md might be in the workspace root, not config_dir
+    if options.personality {
+        // We don't delete soul.md as it's a template, but we can clear the hatching flag
+        // Hatching flag is in localStorage (frontend), so we'll handle that there
+    }
 
     Ok(())
 }
