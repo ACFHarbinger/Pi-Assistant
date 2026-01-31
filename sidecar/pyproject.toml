@@ -13,6 +13,7 @@ dependencies = [
     "pytorch-lightning>=2.4.0",
     "transformers>=4.47.0",
     "sentence-transformers>=3.4.0",
+    "llama-cpp-python>=0.3.0",
     # LLM Providers
     "anthropic>=0.42.0",
     "google-generativeai>=0.8.0",

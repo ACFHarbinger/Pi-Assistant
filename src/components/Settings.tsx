@@ -16,6 +16,7 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
     const [newServerArgs, setNewServerArgs] = useState('');
 
     const [newModelId, setNewModelId] = useState('');
+    const [localBackend, setLocalBackend] = useState<'transformers' | 'llama.cpp' | 'auto'>('auto');
 
     // Reset Options
     const [resetOptions, setResetOptions] = useState({
@@ -88,7 +89,7 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
 
     async function handleLoadModel(id: string) {
         try {
-            await invoke('load_model', { modelId: id });
+            await invoke('load_model', { modelId: id, backend: localBackend === 'auto' ? null : localBackend });
             alert('Model loaded!');
         } catch (e) {
             console.error(e);
@@ -357,11 +358,34 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                                     </div>
                                 ))}
                             </div>
-                            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
-                                <h3 className="font-medium mb-2 dark:text-white">Add Model</h3>
-                                <div className="flex gap-2">
-                                    <input className="flex-1 border p-2 rounded dark:bg-zinc-800 dark:text-white" placeholder="HuggingFace ID or Path" value={newModelId} onChange={e => setNewModelId(e.target.value)} />
-                                    <button onClick={handleAddModel} className="bg-blue-600 text-white px-4 rounded">Add</button>
+                            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium dark:text-zinc-300 mb-1">Local Backend</label>
+                                    <select
+                                        style={{
+                                            backgroundColor: '#18181b',
+                                            color: 'white',
+                                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                            backgroundRepeat: 'no-repeat',
+                                            backgroundPosition: 'right 0.5rem center',
+                                            backgroundSize: '1.2em 1.2em',
+                                            paddingRight: '2.5rem'
+                                        }}
+                                        className="w-full p-2 rounded border border-blue-500/50 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-sm outline-none transition-all cursor-pointer appearance-none"
+                                        value={localBackend}
+                                        onChange={(e: any) => setLocalBackend(e.target.value)}
+                                    >
+                                        <option value="auto">Auto (Detect by extension)</option>
+                                        <option value="llama.cpp">llama.cpp (GGUF)</option>
+                                        <option value="transformers">Transformers (HuggingFace)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <h3 className="font-medium mb-2 dark:text-white">Add Model</h3>
+                                    <div className="flex gap-2">
+                                        <input className="flex-1 border p-2 rounded dark:bg-zinc-800 dark:text-white" placeholder="HuggingFace ID or Path" value={newModelId} onChange={e => setNewModelId(e.target.value)} />
+                                        <button onClick={handleAddModel} className="bg-blue-600 text-white px-4 rounded">Add</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

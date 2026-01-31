@@ -13,6 +13,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{error, info, warn};
 
 use super::{Channel, ChannelMessage, ChannelResponse};
+use pi_core::agent_types::AgentCommand;
 
 /// Telegram bot channel.
 pub struct TelegramChannel {
@@ -47,12 +48,6 @@ impl TelegramChannel {
             users.push(user_id);
             info!("Allowed Telegram user: {}", user_id);
         }
-    }
-
-    /// Check if a user is allowed.
-    async fn is_user_allowed(&self, user_id: u64) -> bool {
-        let users = self.allowed_users.read().await;
-        users.is_empty() || users.contains(&user_id)
     }
 
     /// Handle an incoming message.

@@ -543,7 +543,7 @@ Available tools: shell, code, browser"""
         self, prompt: str, model_id: str | None, max_tokens: int, temperature: float
     ) -> dict[str, Any]:
         """
-        Complete using local HuggingFace model.
+        Complete using local model (transformers or llama.cpp).
         Args:
             prompt: The prompt to use for text completion.
             model_id: The model ID to use for text completion.
@@ -561,19 +561,35 @@ Available tools: shell, code, browser"""
                 "model": None,
             }
 
-        # Use transformers pipeline
-        from transformers import pipeline
+        if model.backend == "llama.cpp":
+            # Use llama.cpp
+            response = model.model(
+                prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stop=["</s>", "User:", "Assistant:"], # Basic stop tokens
+            )
+            return {
+                "text": response["choices"][0]["text"],
+                "provider": "local",
+                "model": model_id,
+                "backend": "llama.cpp",
+            }
+        else:
+            # Use transformers pipeline
+            from transformers import pipeline
 
-        generator = pipeline("text-generation", model=model.model, tokenizer=model.tokenizer)
-        result = generator(
-            prompt,
-            max_new_tokens=max_tokens,
-            temperature=temperature,
-            do_sample=True,
-        )
+            generator = pipeline("text-generation", model=model.model, tokenizer=model.tokenizer)
+            result = generator(
+                prompt,
+                max_new_tokens=max_tokens,
+                temperature=temperature,
+                do_sample=True,
+            )
 
-        return {
-            "text": result[0]["generated_text"][len(prompt) :],
-            "provider": "local",
-            "model": model_id,
-        }
+            return {
+                "text": result[0]["generated_text"][len(prompt) :],
+                "provider": "local",
+                "model": model_id,
+                "backend": "transformers",
+            }

@@ -45,7 +45,7 @@ impl AppState {
             permissions: Arc::new(Mutex::new(PermissionEngine::new())),
             memory: Arc::new(memory),
             sidecar,
-            channel_manager: Arc::new(ChannelManager::new(agent_cmd_tx)),
+            channel_manager: Arc::new(ChannelManager::new()),
         }
     }
 }

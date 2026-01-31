@@ -7,10 +7,8 @@
 pub mod telegram;
 
 use async_trait::async_trait;
-use pi_core::agent_types::AgentCommand;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::mpsc;
 
 /// A message received from a channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,7 +64,6 @@ pub trait Channel: Send + Sync {
 /// Manages multiple communication channels.
 pub struct ChannelManager {
     channels: Arc<RwLock<HashMap<String, Box<dyn Channel>>>>,
-    message_tx: mpsc::Sender<AgentCommand>,
 }
 
 use std::collections::HashMap;
@@ -74,10 +71,9 @@ use tokio::sync::RwLock;
 
 impl ChannelManager {
     /// Create a new channel manager.
-    pub fn new(message_tx: mpsc::Sender<AgentCommand>) -> Self {
+    pub fn new() -> Self {
         Self {
             channels: Arc::new(RwLock::new(HashMap::new())),
-            message_tx,
         }
     }
 

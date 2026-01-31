@@ -278,6 +278,7 @@ pub async fn save_model(model: ModelInfo) -> Result<ModelsConfig, String> {
 pub async fn load_model(
     state: tauri::State<'_, crate::state::AppState>,
     model_id: String,
+    backend: Option<String>,
 ) -> Result<(), String> {
     let mut sidecar = state.sidecar.lock().await;
     // Request sidecar to load model
@@ -285,7 +286,8 @@ pub async fn load_model(
         .request(
             "inference.load_model",
             serde_json::json!({
-                "model_id": model_id
+                "model_id": model_id,
+                "backend": backend
             }),
         )
         .await
@@ -437,7 +439,6 @@ pub async fn save_telegram_config(
     // If enabled, start/restart the channel
     if config.enabled {
         if let Some(token) = &config.token {
-            let mut channel_mgr = state.channel_manager.clone();
             // We need to recreate the channel with the new token
             let channel = Box::new(crate::channels::telegram::TelegramChannel::new(
                 token.clone(),
