@@ -5,7 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Code file operations tool.
 pub struct CodeTool {

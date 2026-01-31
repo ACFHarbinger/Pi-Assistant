@@ -174,3 +174,59 @@ impl Default for ToolRegistry {
     }
 }
 pub mod mcp;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    struct MockTool;
+    #[async_trait]
+    impl Tool for MockTool {
+        fn name(&self) -> &str {
+            "mock"
+        }
+        fn description(&self) -> &str {
+            "A mock tool"
+        }
+        fn parameters_schema(&self) -> serde_json::Value {
+            json!({})
+        }
+        fn permission_tier(&self) -> PermissionTier {
+            PermissionTier::Low
+        }
+        async fn execute(&self, _params: serde_json::Value) -> Result<ToolResult> {
+            Ok(ToolResult::success("mock executed"))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_registry_register_and_get() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(MockTool));
+        assert!(registry.get("mock").is_some());
+        assert!(registry.get("nonexistent").is_none());
+    }
+
+    #[tokio::test]
+    async fn test_registry_execute() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(MockTool));
+
+        let call = ToolCall {
+            tool_name: "mock".into(),
+            parameters: json!({}),
+        };
+
+        let result = registry.execute(&call).await.unwrap();
+        assert!(result.success);
+        assert_eq!(result.output, "mock executed");
+    }
+
+    #[test]
+    fn test_default_tools_exist() {
+        let registry = ToolRegistry::new();
+        assert!(registry.get("shell").is_some());
+        assert!(registry.get("code").is_some());
+    }
+}

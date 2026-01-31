@@ -3,7 +3,7 @@
 use super::handler::WsHandler;
 use axum::{
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
+        ws::{WebSocket, WebSocketUpgrade},
         State,
     },
     response::IntoResponse,
@@ -12,9 +12,8 @@ use axum::{
 };
 use pi_core::agent_types::{AgentCommand, AgentState};
 use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::sync::{mpsc, watch, Mutex};
-use tracing::{error, info, warn};
+use tokio::sync::{mpsc, watch};
+use tracing::{error, info};
 
 /// WebSocket server state.
 pub struct WebSocketServer {

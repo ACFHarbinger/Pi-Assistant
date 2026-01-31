@@ -5,13 +5,12 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::Write;
 use std::process::Stdio;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{mpsc, oneshot, Mutex};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 /// Request sent to the Python sidecar.
@@ -163,8 +162,10 @@ impl SidecarHandle {
             info!("Sidecar stdout closed");
         });
 
-        // Health check
-        let health = self.request("health.ping", serde_json::json!({})).await?;
+        // Health check (use raw request to avoid recursion)
+        let health = self
+            .send_raw_request("health.ping", serde_json::json!({}))
+            .await?;
         info!(response = ?health, "Sidecar health check passed");
 
         Ok(())
@@ -173,10 +174,20 @@ impl SidecarHandle {
     /// Stop the sidecar process.
     pub async fn stop(&mut self) -> Result<()> {
         if let Some(mut child) = self.child.take() {
-            // Try graceful shutdown first
-            let _ = self
-                .request("lifecycle.shutdown", serde_json::json!({}))
-                .await;
+            // Try graceful shutdown first (best effort, no retry)
+            if let Some(stdin) = self.stdin.as_mut() {
+                let id = Uuid::new_v4().to_string();
+                let request = IpcRequest {
+                    id,
+                    method: "lifecycle.shutdown".into(),
+                    params: serde_json::json!({}),
+                };
+                if let Ok(line) = serde_json::to_string(&request) {
+                    let _ = stdin.write_all(format!("{}\n", line).as_bytes()).await;
+                    let _ = stdin.flush().await;
+                }
+            }
+
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
             // Force kill if still running
@@ -188,7 +199,37 @@ impl SidecarHandle {
     }
 
     /// Send a request to the sidecar and await the response.
+    /// automatically restarts the sidecar if it is not running or if the request fails.
     pub async fn request(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        // 1. Ensure sidecar is healthy before sending
+        if !self.is_alive() {
+            warn!("Sidecar is dead or not started, attempting to start...");
+            // Clean up old child if necessary
+            let _ = self.stop().await;
+            self.start().await?;
+        }
+
+        // 2. Try raw request first
+        match self.send_raw_request(method, params.clone()).await {
+            Ok(res) => Ok(res),
+            Err(e) => {
+                warn!(error = %e, "Request failed, triggering restart...");
+                // Restart
+                let _ = self.stop().await;
+                self.start().await?;
+
+                // Retry once
+                self.send_raw_request(method, params).await
+            }
+        }
+    }
+
+    /// Internal method to send request without retry logic
+    async fn send_raw_request(
         &mut self,
         method: &str,
         params: serde_json::Value,
@@ -227,9 +268,17 @@ impl SidecarHandle {
             .map_err(|_| anyhow!("Sidecar response channel closed"))?
     }
 
-    /// Check if the sidecar is running.
-    pub fn is_running(&self) -> bool {
-        self.child.is_some()
+    /// Check if the sidecar process is actually running (not exited).
+    pub fn is_alive(&mut self) -> bool {
+        if let Some(child) = &mut self.child {
+            match child.try_wait() {
+                Ok(Some(_)) => false, // Exited
+                Ok(None) => true,     // Still running
+                Err(_) => false,      // Error checking
+            }
+        } else {
+            false
+        }
     }
 }
 

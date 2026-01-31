@@ -142,3 +142,106 @@ impl Default for PermissionEngine {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_check_shell_allowed() {
+        let engine = PermissionEngine::new();
+        let call = ToolCall {
+            tool_name: "shell".into(),
+            parameters: json!({ "command": "ls -la" }),
+        };
+        match engine.check(&call).unwrap() {
+            PermissionResult::Allowed => {}
+            _ => panic!("Expected Allowed"),
+        }
+    }
+
+    #[test]
+    fn test_check_shell_blocked() {
+        let engine = PermissionEngine::new();
+        let call = ToolCall {
+            tool_name: "shell".into(),
+            parameters: json!({ "command": "sudo rm -rf /" }),
+        };
+        match engine.check(&call).unwrap() {
+            PermissionResult::Denied(_) => {}
+            _ => panic!("Expected Denied"),
+        }
+    }
+
+    #[test]
+    fn test_check_shell_needs_approval() {
+        let engine = PermissionEngine::new();
+        // random command not in safe list
+        let call = ToolCall {
+            tool_name: "shell".into(),
+            parameters: json!({ "command": "git push origin main" }),
+        };
+        match engine.check(&call).unwrap() {
+            PermissionResult::NeedsApproval => {}
+            _ => panic!("Expected NeedsApproval"),
+        }
+    }
+
+    #[test]
+    fn test_user_override() {
+        let mut engine = PermissionEngine::new();
+        let call = ToolCall {
+            tool_name: "shell".into(),
+            parameters: json!({ "command": "git push origin main" }),
+        };
+
+        // Initially needs approval
+        if let PermissionResult::NeedsApproval = engine.check(&call).unwrap() {
+        } else {
+            panic!("Should need approval");
+        }
+
+        // Add override
+        let pattern = call.pattern_key();
+        engine.add_user_override(&pattern, true);
+
+        // Now allowed
+        match engine.check(&call).unwrap() {
+            PermissionResult::Allowed => {}
+            _ => panic!("Expected Allowed after override"),
+        }
+    }
+
+    #[test]
+    fn test_code_read_safe() {
+        let engine = PermissionEngine::new();
+        let call = ToolCall {
+            tool_name: "code".into(),
+            parameters: json!({
+                "action": "read",
+                "path": "/home/user/project/README.md"
+            }),
+        };
+        match engine.check(&call).unwrap() {
+            PermissionResult::Allowed => {}
+            _ => panic!("Expected Allowed for read"),
+        }
+    }
+
+    #[test]
+    fn test_code_write_needs_approval() {
+        let engine = PermissionEngine::new();
+        let call = ToolCall {
+            tool_name: "code".into(),
+            parameters: json!({
+                "action": "write",
+                "path": "/home/user/project/README.md"
+            }),
+        };
+        match engine.check(&call).unwrap() {
+            PermissionResult::NeedsApproval => {}
+            _ => panic!("Expected NeedsApproval for write"),
+        }
+    }
+}
