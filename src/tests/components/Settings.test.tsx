@@ -56,7 +56,7 @@ describe("Settings Component", () => {
     await waitFor(() => {
       expect(vi.mocked(invoke)).toHaveBeenCalledWith("get_mcp_config");
       expect(vi.mocked(invoke)).toHaveBeenCalledWith("get_tools_config");
-      expect(vi.mocked(invoke)).toHaveBeenCalledWith("get_models_config");
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith("list_local_models");
     });
   });
 

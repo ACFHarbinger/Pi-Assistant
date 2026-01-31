@@ -45,6 +45,8 @@ describe("useAgentStore", () => {
     expect(mockInvoke).toHaveBeenCalledWith("start_agent", {
       task: "test task",
       maxIterations: null,
+      provider: null,
+      modelId: null,
     });
     expect(useAgentStore.getState().messages).toHaveLength(1);
     expect(useAgentStore.getState().messages[0].content).toContain(
@@ -60,6 +62,8 @@ describe("useAgentStore", () => {
     expect(useAgentStore.getState().messages[0].content).toBe("hello");
     expect(mockInvoke).toHaveBeenCalledWith("send_message", {
       message: "hello",
+      provider: null,
+      modelId: null,
     });
   });
 });

@@ -8,7 +8,7 @@
 **Languages**
 
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.11+-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Kotlin](https://img.shields.io/badge/kotlin-%237F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 
@@ -25,6 +25,9 @@
 [![PyTorch Lightning](https://img.shields.io/badge/pytorch_lightning-792ee5.svg?style=for-the-badge&logo=pytorchlightning&logoColor=white)](https://lightning.ai/docs/pytorch/stable/)
 [![HuggingFace](https://img.shields.io/badge/huggingface-%23FFD21E.svg?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/)
 [![sentence-transformers](https://img.shields.io/badge/sentence_transformers-UKPLab-orange?style=for-the-badge)](https://www.sbert.net/)
+[![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![Hydra](https://img.shields.io/badge/Hydra-1.1+-89CFF0?style=for-the-badge&logo=hydra&logoColor=white)](https://hydra.cc/)
+[![WandB](https://img.shields.io/badge/Weights_%26_Biases-FFBE00.svg?style=for-the-badge&logo=weightsandbiases&logoColor=black)](https://wandb.ai/site)
 
 **Frontend**
 
@@ -43,6 +46,9 @@
 [![uv](https://img.shields.io/badge/managed%20by-uv-261230.svg?style=for-the-badge)](https://github.com/astral-sh/uv)
 [![Gradle](https://img.shields.io/badge/Gradle-02303A.svg?style=for-the-badge&logo=Gradle&logoColor=white)](https://gradle.org/)
 [![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/)
+[![GitHub Actions](https://img.shields.io/badge/github%20actions-%232088FF.svg?style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/features/actions)
+[![Sphinx](https://img.shields.io/badge/Sphinx-001230?style=for-the-badge&logo=sphinx&logoColor=white)](https://www.sphinx-doc.org/)
+[![Just](https://img.shields.io/badge/just-task%20runner-blue?style=for-the-badge&logo=just&logoColor=white)](https://github.com/casey/just)
 
 **Hardware**
 
@@ -65,6 +71,7 @@
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000?style=for-the-badge&logo=black&logoColor=white)](https://github.com/psf/black)
 [![Prettier](https://img.shields.io/badge/Prettier-F7B93E?style=for-the-badge&logo=prettier&logoColor=black)](https://prettier.io/)
 [![Pre-commit](https://img.shields.io/badge/Pre--commit-F8B424?style=for-the-badge&logo=pre-commit&logoColor=black)](https://pre-commit.com/)
+[![pytest](https://img.shields.io/badge/pytest-%23ffffff.svg?style=for-the-badge&logo=pytest&logoColor=0A9EDC)](https://docs.pytest.org/)
 
 A Universal Agent Harness — a desktop application that hosts an autonomous AI agent capable of controlling the computer, maintaining persistent memory, and training sub-models.
 
