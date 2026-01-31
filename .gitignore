@@ -416,3 +416,11 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Build
+target/
+dist/
+
+# Virtual Environments
+.venv/
+sidecar/.venv/

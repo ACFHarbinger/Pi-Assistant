@@ -1,0 +1,44 @@
+[package]
+name = "pi-assistant"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Universal Agent Harness - Desktop Application"
+
+[lib]
+name = "pi_assistant_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+# Tauri
+tauri = { version = "2.2", features = ["tray-icon"] }
+tauri-plugin-shell = "2.2"
+
+# Workspace dependencies
+tokio.workspace = true
+tokio-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+rusqlite.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+reqwest.workspace = true
+chromiumoxide.workspace = true
+futures.workspace = true
+
+# Internal crates
+pi-core.workspace = true
+pi-protocol.workspace = true
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
