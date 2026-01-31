@@ -1,1 +1,178 @@
-src/pi_sidecar/pyproject.toml
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "machine-learning-zoo"
+version = "0.1.0"
+description = "A comprehensive machine learning library with modular components for building and training various ML models"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+authors = [{ name = "Machine Learning Zoo Contributors" }]
+maintainers = [{ name = "Machine Learning Zoo Contributors" }]
+keywords = [
+    "machine-learning",
+    "deep-learning",
+    "reinforcement-learning",
+    "neural-networks",
+    "pytorch",
+    "transformers",
+    "computer-vision",
+    "nlp",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "torch>=1.9.0",
+    "numpy>=1.21.0",
+    "pandas>=1.3.0",
+    "omegaconf>=2.1.0",
+    "hydra-core>=1.1.0",
+    "tqdm>=4.62.0",
+    "gymnasium>=0.26.0",
+    "huggingface_hub>=0.23.0",
+    "stable-baselines3>=2.3.0",
+    "pi-sidecar-shared",
+    "llama-cpp-python>=0.2.75",
+    "transformers>=4.40.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
+    "black>=22.0.0",
+    "isort>=5.10.0",
+    "mypy>=0.950",
+    "flake8>=4.0.0",
+    "pre-commit>=2.17.0",
+]
+docs = ["sphinx>=4.3.0", "sphinx-rtd-theme>=1.0.0", "myst-parser>=0.17.0"]
+gpu = ["torch>=1.9.0"]
+all = ["machine-learning-zoo[dev,docs,gpu]"]
+
+[project.scripts]
+mlzoo = "main:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/machine-learning-zoo"
+Documentation = "https://machine-learning-zoo.readthedocs.io/"
+Repository = "https://github.com/yourusername/machine-learning-zoo"
+Issues = "https://github.com/yourusername/machine-learning-zoo/issues"
+Changelog = "https://github.com/yourusername/machine-learning-zoo/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*", "docs*", "scripts*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.yml"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["machine_learning_zoo"]
+known_third_party = [
+    "torch",
+    "numpy",
+    "pandas",
+    "omegaconf",
+    "hydra",
+    "tqdm",
+    "gymnasium",
+    "stable_baselines3",
+]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "torch.*",
+    "numpy.*",
+    "pandas.*",
+    "omegaconf.*",
+    "hydra.*",
+    "tqdm.*",
+    "gymnasium.*",
+    "stable_baselines3.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "gpu: marks tests that require GPU (deselect with '-m \"not gpu\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = ["machine_learning_zoo"]
+omit = ["*/tests/*", "*/test_*.py", "setup.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

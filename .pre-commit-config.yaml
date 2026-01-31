@@ -3,7 +3,7 @@ repos:
     rev: v0.9.4
     hooks:
       - id: ruff
-        args: [ --fix ]
+        args: [--fix]
       - id: ruff-format
 
   - repo: local
@@ -19,5 +19,5 @@ repos:
         name: prettier
         entry: npm run format
         language: system
-        types_or: [javascript, jsx, typescript, tsx, css, html]
+        types_or: [javascript, jsx, ts, tsx, css, html]
         pass_filenames: false

@@ -374,14 +374,11 @@ pub async fn start_claude_oauth(app_handle: tauri::AppHandle) -> Result<(), Stri
     );
 
     // Bind to localhost on random port
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));  // localhost resolves to 127.0.0.1
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0)); // localhost resolves to 127.0.0.1
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| format!("Failed to bind loopback server: {}", e))?;
-    let port = listener
-        .local_addr()
-        .map_err(|e| e.to_string())?
-        .port();
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
 
     tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;
@@ -574,8 +571,7 @@ pub async fn check_claude_auth() -> Result<bool, String> {
     let content = tokio::fs::read_to_string(&secrets_path)
         .await
         .map_err(|e| e.to_string())?;
-    let secrets: HashMap<String, String> =
-        serde_json::from_str(&content).unwrap_or_default();
+    let secrets: HashMap<String, String> = serde_json::from_str(&content).unwrap_or_default();
 
     Ok(secrets.contains_key("claude_max_oauth"))
 }
@@ -594,8 +590,7 @@ pub async fn disconnect_claude_auth() -> Result<(), String> {
     let content = tokio::fs::read_to_string(&secrets_path)
         .await
         .map_err(|e| e.to_string())?;
-    let mut secrets: HashMap<String, String> =
-        serde_json::from_str(&content).unwrap_or_default();
+    let mut secrets: HashMap<String, String> = serde_json::from_str(&content).unwrap_or_default();
 
     secrets.remove("claude_max_oauth");
     secrets.remove("claude_max_refresh");
@@ -623,8 +618,7 @@ pub async fn check_provider_auth(provider: String) -> Result<bool, String> {
     let content = tokio::fs::read_to_string(&secrets_path)
         .await
         .map_err(|e| e.to_string())?;
-    let secrets: HashMap<String, String> =
-        serde_json::from_str(&content).unwrap_or_default();
+    let secrets: HashMap<String, String> = serde_json::from_str(&content).unwrap_or_default();
 
     Ok(secrets.contains_key(&format!("{}_oauth", provider)))
 }
@@ -643,8 +637,7 @@ pub async fn disconnect_provider_auth(provider: String) -> Result<(), String> {
     let content = tokio::fs::read_to_string(&secrets_path)
         .await
         .map_err(|e| e.to_string())?;
-    let mut secrets: HashMap<String, String> =
-        serde_json::from_str(&content).unwrap_or_default();
+    let mut secrets: HashMap<String, String> = serde_json::from_str(&content).unwrap_or_default();
 
     secrets.remove(&format!("{}_oauth", provider));
     secrets.remove(&format!("{}_refresh", provider));

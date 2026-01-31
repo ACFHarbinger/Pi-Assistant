@@ -27,3 +27,10 @@ members = ["sidecars/ml", "sidecars/logic", "sidecars/shared"]
 pi-sidecar-shared = { workspace = true }
 machine-learning-zoo = { workspace = true }
 pi-sidecar-logic = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "black>=26.1.0",
+    "mypy>=1.19.1",
+    "ruff>=0.14.14",
+]

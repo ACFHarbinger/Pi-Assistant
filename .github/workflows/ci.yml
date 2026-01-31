@@ -39,6 +39,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install Coverage Tool
         run: cargo install cargo-tarpaulin
+      - name: Create Dummy Frontend Dist
+        run: |
+          mkdir -p dist
+          touch dist/index.html
       - name: Rust Tests & Coverage
         run: cargo tarpaulin --out Xml --output-dir target/tarpaulin
       - name: Upload Rust Coverage
@@ -56,6 +60,8 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+      - name: Install Lint Dependencies
+        run: uv sync
       - name: Python Format Check
         run: uv run ruff format --check .
       - name: Python Lint Check
@@ -72,7 +78,7 @@ jobs:
       - name: Install Dependencies
         run: uv sync
       - name: Python Tests & Coverage
-        run: uv run pytest --cov=sidecars --cov-report=xml
+        run: uv run pytest --cov=sidecars --cov-report=xml:python-coverage.xml
       - name: Upload Python Coverage
         uses: codecov/codecov-action@v5
         with:
@@ -106,11 +112,11 @@ jobs:
           node-version: 20
           cache: "npm"
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
       - name: Frontend Tests & Coverage
         run: npm run test -- --coverage
       - name: Upload TypeScript Coverage
         uses: codecov/codecov-action@v5
         with:
-          files: ./typescript/coverage/clover.xml
+          files: ./coverage/clover.xml
           flags: typescript
