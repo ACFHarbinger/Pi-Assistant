@@ -1,5 +1,10 @@
 # Pi-Assistant
 
+[![CI](https://github.com/ACFHarbinger/Pi-Assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/ACFHarbinger/Pi-Assistant/actions/workflows/ci.yml)
+[![codecov (rust)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant/branch/main/graph/badge.svg?flag=rust)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant)
+[![codecov (python)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant/branch/main/graph/badge.svg?flag=python)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant)
+[![codecov (typescript)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant/branch/main/graph/badge.svg?flag=typescript)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant)
+
 **Languages**
 
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -90,33 +95,42 @@ Pi-Assistant is a multi-runtime system where a Rust core orchestrates an AI agen
 ## Features
 
 ### Agent Loop (Continuous Mode)
+
 The agent iterates autonomously on a task until completion, a manual stop, or an iteration limit. Each iteration: retrieve context from memory, plan the next step via LLM, check permissions, execute tools, store results.
 
 ### Tool System
-| Tool | Description |
-|------|-------------|
-| **Shell** | Execute commands with safety-tier gating |
-| **Browser** | Headless Chrome via Chrome DevTools Protocol |
-| **Code** | Read/write/patch files within allowed directories |
+
+| Tool             | Description                                               |
+| ---------------- | --------------------------------------------------------- |
+| **Shell**        | Execute commands with safety-tier gating                  |
+| **Browser**      | Headless Chrome via Chrome DevTools Protocol              |
+| **Code**         | Read/write/patch files within allowed directories         |
 | **ML Inference** | Delegate to Python sidecar for embeddings and completions |
 
 ### Human-in-the-Loop
+
 The agent can pause and ask the user a question via the desktop UI or the mobile app. Permission requests for medium-risk operations are surfaced as approval dialogs on both interfaces.
 
 ### Persistent Memory
+
 Dual-layer memory system:
+
 - **SQLite** for structured data (sessions, messages, task logs, tool executions)
 - **sqlite-vec** for semantic vector search over embeddings (384-dim, all-MiniLM-L6-v2)
 
 ### Mobile Remote
+
 An Android app connects over the local network via WebSockets, providing:
+
 - Real-time agent status monitoring
 - Chat interface for sending commands
 - Permission approval/denial
 - Voice input via Android SpeechRecognizer
 
 ### Safety Layer
+
 Three-tier permission engine:
+
 - **Auto-Approve**: Read-only operations (`ls`, `cat`, `git status`, etc.)
 - **Ask User**: Mutations (`git commit`, `npm install`, file writes)
 - **Block**: Destructive operations (`sudo`, `rm -rf /`, `dd`, credential exposure)
@@ -178,20 +192,20 @@ Configure the server IP in the Android app's settings screen to connect.
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, data flows, code snippets |
-| [AGENTS.md](AGENTS.md) | Agent loop internals, tool system, planning |
-| [DEVELOPMENT.md](DEVELOPMENT.md) | Developer setup and build instructions |
-| [DEPENDENCIES.md](DEPENDENCIES.md) | All dependencies across all runtimes |
-| [TESTING.md](TESTING.md) | Testing strategy and how to run tests |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
-| [TUTORIAL.md](TUTORIAL.md) | End-to-end getting started tutorial |
-| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and solutions |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [SECURITY.md](SECURITY.md) | Security policy and vulnerability reporting |
-| [docs/IPC-PROTOCOL.md](docs/IPC-PROTOCOL.md) | IPC wire protocol specification |
-| [docs/SAFETY-MODEL.md](docs/SAFETY-MODEL.md) | Permission tiers and sandboxing model |
+| Document                                     | Description                                    |
+| -------------------------------------------- | ---------------------------------------------- |
+| [ARCHITECTURE.md](ARCHITECTURE.md)           | System architecture, data flows, code snippets |
+| [AGENTS.md](AGENTS.md)                       | Agent loop internals, tool system, planning    |
+| [DEVELOPMENT.md](DEVELOPMENT.md)             | Developer setup and build instructions         |
+| [DEPENDENCIES.md](DEPENDENCIES.md)           | All dependencies across all runtimes           |
+| [TESTING.md](TESTING.md)                     | Testing strategy and how to run tests          |
+| [CONTRIBUTING.md](CONTRIBUTING.md)           | Contribution guidelines                        |
+| [TUTORIAL.md](TUTORIAL.md)                   | End-to-end getting started tutorial            |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md)     | Common issues and solutions                    |
+| [CHANGELOG.md](CHANGELOG.md)                 | Version history                                |
+| [SECURITY.md](SECURITY.md)                   | Security policy and vulnerability reporting    |
+| [docs/IPC-PROTOCOL.md](docs/IPC-PROTOCOL.md) | IPC wire protocol specification                |
+| [docs/SAFETY-MODEL.md](docs/SAFETY-MODEL.md) | Permission tiers and sandboxing model          |
 
 ## License
 
