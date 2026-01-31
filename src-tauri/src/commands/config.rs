@@ -21,6 +21,7 @@ pub struct ModelsConfig {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModelInfo {
     pub id: String,
+    pub provider: String,     // "anthropic", "gemini", "local", etc.
     pub path: Option<String>, // Local path or HF ID
     pub description: Option<String>,
 }
@@ -201,11 +202,38 @@ pub async fn get_models_config() -> Result<ModelsConfig, String> {
         .join("models.json");
     if !path.exists() {
         return Ok(ModelsConfig {
-            models: vec![ModelInfo {
-                id: "gpt2".into(),
-                path: None,
-                description: Some("Default small model".into()),
-            }],
+            models: vec![
+                ModelInfo {
+                    id: "gemini-3-pro".into(),
+                    provider: "google".into(),
+                    path: None,
+                    description: Some("Gemini 3 Pro".into()),
+                },
+                ModelInfo {
+                    id: "gemini-3-flash".into(),
+                    provider: "google".into(),
+                    path: None,
+                    description: Some("Gemini 3 Flash".into()),
+                },
+                ModelInfo {
+                    id: "claude-4-5-sonnet-latest".into(),
+                    provider: "google".into(),
+                    path: None,
+                    description: Some("Claude Sonnet 4.5".into()),
+                },
+                ModelInfo {
+                    id: "claude-4-5-opus-latest".into(),
+                    provider: "google".into(),
+                    path: None,
+                    description: Some("Claude Opus 4.5".into()),
+                },
+                ModelInfo {
+                    id: "gpt-oss-120b".into(),
+                    provider: "google".into(),
+                    path: None,
+                    description: Some("GPT-OSS 120B".into()),
+                },
+            ],
         });
     }
     let content = fs::read_to_string(&path).await.map_err(|e| e.to_string())?;
@@ -317,6 +345,61 @@ pub async fn reset_agent(options: ResetOptions) -> Result<(), String> {
         // We don't delete soul.md as it's a template, but we can clear the hatching flag
         // Hatching flag is in localStorage (frontend), so we'll handle that there
     }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_agent_name(name: String) -> Result<(), String> {
+    let config_dir = get_config_dir().map_err(|e| e.to_string())?;
+    let path = config_dir.join("agent_config.json");
+
+    let mut config: HashMap<String, String> = if path.exists() {
+        let content = fs::read_to_string(&path).await.map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    config.insert("agent_name".to_string(), name);
+
+    let json = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&path, json).await.map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_current_model() -> Result<Option<String>, String> {
+    let config_dir = get_config_dir().map_err(|e| e.to_string())?;
+    let path = config_dir.join("agent_config.json");
+
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let content = fs::read_to_string(&path).await.map_err(|e| e.to_string())?;
+    let config: HashMap<String, String> = serde_json::from_str(&content).unwrap_or_default();
+
+    Ok(config.get("current_model").cloned())
+}
+
+#[tauri::command]
+pub async fn save_current_model(model_id: String) -> Result<(), String> {
+    let config_dir = get_config_dir().map_err(|e| e.to_string())?;
+    let path = config_dir.join("agent_config.json");
+
+    let mut config: HashMap<String, String> = if path.exists() {
+        let content = fs::read_to_string(&path).await.map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    config.insert("current_model".to_string(), model_id);
+
+    let json = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&path, json).await.map_err(|e| e.to_string())?;
 
     Ok(())
 }

@@ -40,6 +40,7 @@ class RequestHandler:
             "inference.load_model": self._inference_load_model,
             "personality.get_hatching": self._personality_get_hatching,
             "personality.get_prompt": self._personality_get_prompt,
+            "personality.hatch_chat": self._personality_hatch_chat,
         }
 
     async def dispatch(
@@ -68,22 +69,12 @@ class RequestHandler:
         """
         Handle inference model load requests.
         """
-        from pi_sidecar.inference.completion import get_completion_engine
-        
-        engine = get_completion_engine()
         model_name = params.get("model_id") or params.get("path")
         if not model_name:
              raise ValueError("Missing model_id or path")
              
-        # Use simple load_model, or if it's a path, handle accordingly
-        # This assumes the engine has logic to handle HF IDs 
-        # (The existing load_model implementation in completion.py handles paths/ids via from_pretrained)
-        
-        # We need to ensure we call the engine's method correctly
-        engine.model_name = model_name
-        engine._load_model() # This reloads based on self.model_name
-        
-        return {"status": "loaded", "model_id": model_name}
+        # Use the multi-provider engine to handle loading
+        return await self.engine.load_model(model_name)
 
     # ── Built-in handlers ─────────────────────────────────────────
 
@@ -195,3 +186,30 @@ class RequestHandler:
         from pi_sidecar.personality import get_personality
         personality = get_personality()
         return {"prompt": personality.system_prompt}
+    async def _personality_hatch_chat(self, params, _cb):
+        """
+        Handle interactive hatching chat.
+        """
+        from pi_sidecar.personality import get_personality
+        personality = get_personality()
+        
+        # Build context with hatching system prompt
+        system_prompt = f"{personality.system_prompt}\n\n# Hatching Context\nYou are in the 'hatching' phase. Be extremely welcoming and discuss your identity with the user."
+        
+        history = params.get("history", [])
+        
+        # Prepare messages for inference
+        prompt = f"{system_prompt}\n\n"
+        for msg in history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            prompt += f"[{role}]: {content}\n"
+        
+        # Get completion
+        result = await self.engine.complete(
+            prompt=prompt,
+            provider=params.get("provider", "local"),
+            model_id=params.get("model_id"),
+        )
+        
+        return {"text": result.get("text", "")}

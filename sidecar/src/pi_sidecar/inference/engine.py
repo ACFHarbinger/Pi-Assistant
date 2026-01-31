@@ -33,6 +33,32 @@ class InferenceEngine:
         self._anthropic_client = None
         self._gemini_client = None
 
+    async def load_model(self, model_id: str) -> dict[str, Any]:
+        """
+        Load a model by ID or handle API-based models.
+        Args:
+            model_id: The model ID to load.
+        Returns:
+            A dictionary containing the status of the operation.
+        """
+        # API models don't need local loading
+        is_api = any(
+            p in model_id.lower()
+            for p in ["claude-", "gemini-", "gpt-", "deepseek-"]
+        )
+
+        if is_api:
+            logger.info("API model selected: %s. No loading required.", model_id)
+            return {"status": "ready", "model_id": model_id}
+
+        # Local models use the registry
+        try:
+            await self.registry.load_model(model_id)
+            return {"status": "loaded", "model_id": model_id}
+        except Exception as e:
+            logger.error("Failed to load local model %s: %s", model_id, e)
+            raise
+
     async def embed(self, text: str, model_id: str = "all-MiniLM-L6-v2") -> list[float]:
         """
         Generate embeddings using sentence-transformers.

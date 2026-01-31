@@ -1,10 +1,61 @@
 import { useState, useRef, useEffect } from "react";
 import { useAgentStore } from "../stores/agentStore";
+import { invoke } from "@tauri-apps/api/core";
 
 export function ChatInterface() {
     const { messages, state, sendMessage } = useAgentStore();
     const [input, setInput] = useState("");
+    const [availableModels, setAvailableModels] = useState<{ id: string, provider: string }[]>([]);
+    const [currentModel, setCurrentModel] = useState<string | null>(null);
+    const [currentProvider, setCurrentProvider] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Load available models and current selection
+    useEffect(() => {
+        const loadConfigs = async () => {
+            try {
+                const models = await invoke<{ models: { id: string, provider: string }[] }>('get_models_config');
+                setAvailableModels(models.models);
+
+                const current = await invoke<string | null>('get_current_model');
+                setCurrentModel(current);
+
+                // Initialize provider from current model if found
+                if (current) {
+                    const model = models.models.find(m => m.id === current);
+                    if (model) setCurrentProvider(model.provider);
+                } else if (models.models.length > 0) {
+                    setCurrentProvider(models.models[0].provider);
+                }
+            } catch (e) {
+                console.error('Failed to load model configs:', e);
+            }
+        };
+        loadConfigs();
+    }, []);
+
+    const handleModelChange = async (id: string) => {
+        try {
+            await invoke('save_current_model', { modelId: id });
+            await invoke('load_model', { modelId: id });
+            setCurrentModel(id);
+        } catch (e) {
+            console.error('Failed to switch model:', e);
+            alert('Failed to switch model: ' + e);
+        }
+    };
+
+    const handleProviderChange = (provider: string) => {
+        setCurrentProvider(provider);
+        // Automatically select first model of this provider
+        const firstModel = availableModels.find(m => m.provider === provider);
+        if (firstModel) {
+            handleModelChange(firstModel.id);
+        }
+    };
+
+    const filteredModels = availableModels.filter(m => m.provider === currentProvider);
+    const uniqueProviders = Array.from(new Set(availableModels.map(m => m.provider)));
 
     // Auto-scroll to bottom on new messages
     useEffect(() => {
@@ -23,11 +74,41 @@ export function ChatInterface() {
     return (
         <div className="glass rounded-2xl h-[600px] flex flex-col">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-white/10">
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                     <span className="text-primary-400">💬</span>
                     Chat
                 </h2>
+
+                <div className="flex items-center gap-4">
+                    {/* Provider Selector */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-gray-500 uppercase tracking-tighter font-black">Provider:</span>
+                        <select
+                            value={currentProvider || ''}
+                            onChange={(e) => handleProviderChange(e.target.value)}
+                            className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500/50 appearance-none cursor-pointer capitalize"
+                        >
+                            {uniqueProviders.map(p => (
+                                <option key={p} value={p} className="bg-gray-900 capitalize">{p}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Model Selector */}
+                    <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+                        <span className="text-[10px] text-gray-500 uppercase tracking-tighter font-black">Model:</span>
+                        <select
+                            value={currentModel || ''}
+                            onChange={(e) => handleModelChange(e.target.value)}
+                            className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500/50 appearance-none cursor-pointer"
+                        >
+                            {filteredModels.map(m => (
+                                <option key={m.id} value={m.id} className="bg-gray-900">{m.id}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
             </div>
 
             {/* Messages */}
@@ -47,10 +128,10 @@ export function ChatInterface() {
                         >
                             <div
                                 className={`max-w-[80%] rounded-2xl px-4 py-3 ${msg.role === "user"
-                                        ? "bg-primary-600 text-white"
-                                        : msg.role === "system"
-                                            ? "bg-gray-800 text-gray-300 text-sm italic"
-                                            : "bg-gray-800 text-gray-100"
+                                    ? "bg-primary-600 text-white"
+                                    : msg.role === "system"
+                                        ? "bg-gray-800 text-gray-300 text-sm italic"
+                                        : "bg-gray-800 text-gray-100"
                                     }`}
                             >
                                 <p className="whitespace-pre-wrap">{msg.content}</p>

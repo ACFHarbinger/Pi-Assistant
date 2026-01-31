@@ -9,39 +9,97 @@ type WizardStep = 'welcome' | 'model' | 'api-key' | 'skills' | 'hatching';
 
 export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
     const [step, setStep] = useState<WizardStep>('welcome');
-    const [provider, setProvider] = useState<'anthropic' | 'gemini' | 'local'>('anthropic');
+    const [provider, setProvider] = useState<'google' | 'local'>('google');
+    const [modelId, setModelId] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [skills, setSkills] = useState({
         shell: true,
         browser: true,
         files: true
     });
-    const [hatchingMessage, setHatchingMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showAdvancedAuth, setShowAdvancedAuth] = useState(false);
+    const [hatchMessages, setHatchMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
+    const [input, setInput] = useState('');
 
-    // Fetch hatching message from sidecar for the final step
+    const models = {
+        google: [
+            { id: 'claude-4-5-sonnet-latest', name: 'Claude Sonnet 4.5' },
+            { id: 'claude-4-5-sonnet-thinking', name: 'Claude Sonnet 4.5 (Thinking)' },
+            { id: 'claude-4-5-opus-thinking', name: 'Claude Opus 4.5 (Thinking)' },
+            { id: 'gemini-3-pro-high', name: 'Gemini 3 Pro (High) ⚠️' },
+            { id: 'gemini-3-pro-low', name: 'Gemini 3 Pro (Low) ⚠️' },
+            { id: 'gemini-3-flash', name: 'Gemini 3 Flash ✨ New' },
+            { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
+        ],
+        local: [
+            { id: 'llama-3-8b', name: 'Llama 3 (8B)' },
+            { id: 'mistral-7b', name: 'Mistral (7B)' },
+        ]
+    };
+
+    // Set default model when provider changes
     useEffect(() => {
-        if (step === 'hatching') {
-            const fetchHatchingMessage = async () => {
+        if (provider) {
+            setModelId(models[provider][0].id);
+        }
+    }, [provider]);
+
+    // Start conversational hatching
+    useEffect(() => {
+        if (step === 'hatching' && hatchMessages.length === 0) {
+            const startHatching = async () => {
+                setIsLoading(true);
                 try {
-                    const result = await invoke<{ message: string }>('sidecar_request', {
-                        method: 'personality.get_hatching',
-                        params: {},
+                    const result = await invoke<{ text: string }>('sidecar_request', {
+                        method: 'personality.hatch_chat',
+                        params: {
+                            history: [],
+                            provider,
+                            model_id: modelId,
+                        },
                     });
-                    setHatchingMessage(result.message);
+                    setHatchMessages([{ role: 'assistant', content: result.text }]);
                 } catch (e) {
-                    console.error('Failed to fetch hatching message:', e);
-                    setHatchingMessage("I'm Pi, your personal AI assistant. Let's get started!");
+                    console.error('Failed to start hatching chat:', e);
+                    setHatchMessages([{ role: 'assistant', content: "Hey! I'm Pi. I've just been hatched and I'm ready to help. What should we do first?" }]);
+                } finally {
+                    setIsLoading(false);
                 }
             };
-            fetchHatchingMessage();
+            startHatching();
         }
     }, [step]);
+
+    const handleHatchSend = async () => {
+        if (!input.trim() || isLoading) return;
+
+        const newMessages = [...hatchMessages, { role: 'user' as const, content: input }];
+        setHatchMessages(newMessages);
+        setInput('');
+        setIsLoading(true);
+
+        try {
+            const result = await invoke<{ text: string }>('sidecar_request', {
+                method: 'personality.hatch_chat',
+                params: {
+                    history: newMessages,
+                    provider,
+                    model_id: modelId,
+                },
+            });
+            setHatchMessages([...newMessages, { role: 'assistant', content: result.text }]);
+        } catch (e) {
+            setHatchMessages([...newMessages, { role: 'assistant', content: "Sorry, I had a bit of a glitch there. Can you repeat that?" }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleNext = async () => {
         if (step === 'welcome') setStep('model');
         else if (step === 'model') {
+            await invoke('save_current_model', { modelId });
             if (provider === 'local') setStep('skills');
             else setStep('api-key');
         }
@@ -84,7 +142,7 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
 
     return (
         <div className="fixed inset-0 z-50 bg-gray-950 flex items-center justify-center p-6 font-sans">
-            <div className="max-w-xl w-full">
+            <div className={`transition-all duration-500 ${step === 'hatching' ? 'max-w-3xl' : 'max-w-xl'} w-full`}>
                 {/* Progress Indicators */}
                 <div className="flex justify-center gap-2 mb-12">
                     {(['welcome', 'model', 'api-key', 'skills', 'hatching'] as WizardStep[]).map((s, i) => (
@@ -104,6 +162,28 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                             <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-accent-500 rounded-3xl flex items-center justify-center mx-auto animate-pulse">
                                 <span className="text-4xl">🤖</span>
                             </div>
+
+                            {provider && (
+                                <div className="max-w-xs mx-auto space-y-2 animate-in fade-in slide-in-from-top-2">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Select Brain</label>
+                                    <div className="relative">
+                                        <select
+                                            value={modelId}
+                                            onChange={(e) => setModelId(e.target.value)}
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 appearance-none cursor-pointer transition-all"
+                                        >
+                                            {models[provider].map((m: any) => (
+                                                <option key={m.id} value={m.id} className="bg-gray-950">{m.name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                            ▼
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 italic">This will be your agent's primary model.</p>
+                                </div>
+                            )}
+
                             <h1 className="text-3xl font-bold text-white">Meet Pi</h1>
                             <p className="text-gray-400 text-lg leading-relaxed">
                                 I'm your universal agent harness. I can code, browse, and control your system to help you get things done.
@@ -125,20 +205,12 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
 
                             <div className="space-y-3">
                                 <ProviderCard
-                                    id="anthropic"
-                                    name="Anthropic Claude"
-                                    desc="Best for coding and logical reasoning."
-                                    icon="🧠"
-                                    selected={provider === 'anthropic'}
-                                    onClick={() => setProvider('anthropic')}
-                                />
-                                <ProviderCard
-                                    id="gemini"
-                                    name="Google Gemini"
-                                    desc="Advanced and high-speed intelligence."
-                                    icon="✨"
-                                    selected={provider === 'gemini'}
-                                    onClick={() => setProvider('gemini')}
+                                    id="google"
+                                    name="Google Antigravity"
+                                    desc="All your top-tier models (Claude, Gemini, GPT-OSS)."
+                                    icon="☁️"
+                                    selected={provider === 'google'}
+                                    onClick={() => setProvider('google')}
                                 />
                                 <ProviderCard
                                     id="local"
@@ -164,7 +236,7 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                         <div className="space-y-6">
                             <h2 className="text-2xl font-bold text-white">Authentication</h2>
                             <p className="text-sm text-gray-400">
-                                Connect Pi to your {provider === 'anthropic' ? 'Anthropic' : 'Google'} account.
+                                Connect Pi to your Google account.
                             </p>
 
                             <div className="space-y-4">
@@ -172,7 +244,7 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                                 <div className="p-4 bg-primary-500/5 rounded-2xl border border-primary-500/20 space-y-4">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-sm font-bold text-primary-400">OAuth Method (Recommended)</h3>
-                                        {provider === 'gemini' && (
+                                        {provider === 'google' && (
                                             <button
                                                 onClick={() => setShowAdvancedAuth(!showAdvancedAuth)}
                                                 className="text-[10px] text-primary-500 hover:underline"
@@ -182,7 +254,7 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                                         )}
                                     </div>
 
-                                    {!showAdvancedAuth && provider === 'gemini' && (
+                                    {!showAdvancedAuth && (
                                         <p className="text-xs text-gray-500">
                                             Seamless "Antigravity" login. No setup required.
                                         </p>
@@ -221,12 +293,12 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                                             setIsLoading(true);
                                             try {
                                                 const code = await invoke<string>('start_oauth', {
-                                                    provider,
+                                                    provider: 'google',
                                                     clientId: clientId || undefined
                                                 });
 
                                                 await invoke('exchange_oauth_code', {
-                                                    provider,
+                                                    provider: 'google',
                                                     code,
                                                     clientId: clientId || undefined,
                                                     clientSecret: clientSecret || undefined,
@@ -241,8 +313,8 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                                         }}
                                         className="w-full py-3 bg-white text-black font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-gray-200 transition-all"
                                     >
-                                        <span>{provider === 'gemini' ? '🇬' : '🅰️'}</span>
-                                        Sign in with {provider === 'gemini' ? 'Google' : 'Anthropic'}
+                                        <span>🇬</span>
+                                        Sign in with Google
                                     </button>
                                 </div>
 
@@ -315,22 +387,67 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                         </div>
                     )}
 
-                    {/* Hatching Step */}
+                    {/* Hatching Step (Interactive Chat) */}
                     {step === 'hatching' && (
-                        <div className="text-center space-y-6">
-                            <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-accent-500 rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-primary-500/20">
-                                <span className="text-4xl text-white">🤖</span>
+                        <div className="space-y-6 flex flex-col h-[500px]">
+                            <div className="flex items-center gap-4 mb-2">
+                                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/20">
+                                    <span className="text-xl text-white">🤖</span>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white leading-tight">Pi is Ready</h2>
+                                    <p className="text-xs text-gray-500 uppercase font-bold tracking-widest leading-tight">Interactive Hatching</p>
+                                </div>
+                                <button
+                                    onClick={handleComplete}
+                                    className="ml-auto px-4 py-2 bg-primary-600/20 hover:bg-primary-600 text-primary-400 hover:text-white border border-primary-500/30 rounded-xl text-xs font-bold transition-all"
+                                >
+                                    Begin Journey
+                                </button>
                             </div>
-                            <h2 className="text-3xl font-bold text-white">Pi is Ready</h2>
-                            <div className="text-gray-300 text-left bg-white/5 p-6 rounded-2xl border border-white/5 max-h-60 overflow-y-auto italic">
-                                {formatMessage(hatchingMessage)}
+
+                            <div className="flex-1 bg-black/40 rounded-2xl border border-white/5 p-4 overflow-y-auto space-y-4 custom-scrollbar">
+                                {hatchMessages.map((msg, i) => (
+                                    <div key={i} className={`flex ${msg.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
+                                        <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'assistant'
+                                            ? 'bg-gray-800 text-gray-100 rounded-tl-none border border-white/5'
+                                            : 'bg-primary-600 text-white rounded-tr-none shadow-lg shadow-primary-600/10'
+                                            }`}>
+                                            {formatMessage(msg.content)}
+                                        </div>
+                                    </div>
+                                ))}
+                                {isLoading && hatchMessages.length > 0 && (
+                                    <div className="flex justify-start">
+                                        <div className="bg-gray-800 p-3 rounded-2xl rounded-tl-none animate-pulse">
+                                            <div className="flex gap-1">
+                                                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" />
+                                                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <button
-                                onClick={handleComplete}
-                                className="w-full py-4 bg-gradient-to-r from-primary-600 to-accent-600 hover:from-primary-500 hover:to-accent-500 text-white font-bold rounded-xl shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
-                            >
-                                Begin Journey
-                            </button>
+
+                            <div className="relative mt-2">
+                                <input
+                                    type="text"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleHatchSend()}
+                                    placeholder="Talk to your new friend..."
+                                    disabled={isLoading}
+                                    className="w-full p-4 pr-14 bg-white/5 border border-white/10 rounded-2xl text-white focus:border-primary-500 outline-none transition-all"
+                                />
+                                <button
+                                    onClick={handleHatchSend}
+                                    disabled={isLoading || !input.trim()}
+                                    className="absolute right-2 top-2 bottom-2 px-4 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-500 disabled:opacity-50 transition-all"
+                                >
+                                    Send
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
