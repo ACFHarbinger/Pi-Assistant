@@ -65,7 +65,7 @@ export function ChatInterface() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim()) return;
-        sendMessage(input.trim());
+        sendMessage(input.trim(), currentProvider || undefined, currentModel || undefined);
         setInput("");
     };
 

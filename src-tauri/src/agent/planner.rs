@@ -39,6 +39,8 @@ impl AgentPlanner {
         task: &str,
         iteration: u32,
         context: Vec<serde_json::Value>,
+        provider: Option<&str>,
+        model_id: Option<&str>,
     ) -> Result<AgentPlan> {
         info!(task = task, iteration = iteration, "Generating plan");
 
@@ -53,6 +55,8 @@ impl AgentPlanner {
                     "iteration": iteration,
                     "context": context,
                     "tools": tools,
+                    "provider": provider.unwrap_or("local"),
+                    "model_id": model_id,
                 }),
             )
             .await?;
@@ -70,13 +74,21 @@ impl AgentPlanner {
     }
 
     /// Generate a simple completion (for chat responses).
-    pub async fn complete(&self, prompt: &str, max_tokens: Option<u32>) -> Result<String> {
+    pub async fn complete(
+        &self,
+        prompt: &str,
+        provider: Option<&str>,
+        model_id: Option<&str>,
+        max_tokens: Option<u32>,
+    ) -> Result<String> {
         let mut sidecar = self.sidecar.lock().await;
         let response = sidecar
             .request(
                 "inference.complete",
                 serde_json::json!({
                     "prompt": prompt,
+                    "provider": provider.unwrap_or("local"),
+                    "model_id": model_id,
                     "max_tokens": max_tokens.unwrap_or(1024),
                 }),
             )

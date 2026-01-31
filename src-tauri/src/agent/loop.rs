@@ -20,12 +20,15 @@ pub struct AgentTask {
     pub description: String,
     pub max_iterations: u32,
     pub session_id: Uuid,
+    pub provider: String,
+    pub model_id: Option<String>,
 }
 
 /// Handle for a running agent loop.
 pub struct AgentLoopHandle {
     pub cancel_token: CancellationToken,
     pub join_handle: tokio::task::JoinHandle<Result<StopReason>>,
+    pub cmd_tx: mpsc::Sender<AgentCommand>,
 }
 
 /// Plan from the LLM planner.
@@ -41,7 +44,6 @@ pub struct AgentPlan {
 pub fn spawn_agent_loop(
     task: AgentTask,
     state_tx: watch::Sender<AgentState>,
-    cmd_rx: Arc<Mutex<mpsc::Receiver<AgentCommand>>>,
     tool_registry: Arc<ToolRegistry>,
     memory: Arc<MemoryManager>,
     sidecar: Arc<Mutex<SidecarHandle>>,
@@ -49,6 +51,7 @@ pub fn spawn_agent_loop(
 ) -> AgentLoopHandle {
     let cancel_token = CancellationToken::new();
     let token = cancel_token.clone();
+    let (cmd_tx, cmd_rx) = mpsc::channel(32);
 
     let join_handle = tokio::spawn(async move {
         agent_loop(
@@ -67,13 +70,14 @@ pub fn spawn_agent_loop(
     AgentLoopHandle {
         cancel_token,
         join_handle,
+        cmd_tx,
     }
 }
 
 async fn agent_loop(
     task: AgentTask,
     state_tx: watch::Sender<AgentState>,
-    cmd_rx: Arc<Mutex<mpsc::Receiver<AgentCommand>>>,
+    mut cmd_rx: mpsc::Receiver<AgentCommand>,
     tool_registry: Arc<ToolRegistry>,
     memory: Arc<MemoryManager>,
     sidecar: Arc<Mutex<SidecarHandle>>,
@@ -110,7 +114,7 @@ async fn agent_loop(
         });
 
         // ── Check for incoming commands (non-blocking) ───────────────
-        if let Ok(cmd) = cmd_rx.lock().await.try_recv() {
+        if let Ok(cmd) = cmd_rx.try_recv() {
             match cmd {
                 AgentCommand::Stop => {
                     let _ = state_tx.send(AgentState::Stopped {
@@ -128,7 +132,7 @@ async fn agent_loop(
 
                     // Block until Resume or Stop
                     loop {
-                        let cmd = cmd_rx.lock().await.recv().await;
+                        let cmd = cmd_rx.recv().await;
                         match cmd {
                             Some(AgentCommand::Resume) => break,
                             Some(AgentCommand::Stop) => {
@@ -166,6 +170,8 @@ async fn agent_loop(
                         "task": task.description,
                         "iteration": iteration,
                         "context": context,
+                        "provider": task.provider,
+                        "model_id": task.model_id,
                     }),
                 )
                 .await?;
@@ -187,7 +193,7 @@ async fn agent_loop(
                 awaiting_permission: None,
             });
 
-            let answer = wait_for_answer(&cmd_rx, &cancel_token).await?;
+            let answer = wait_for_answer(&mut cmd_rx, &cancel_token).await?;
             memory
                 .store_message(&task.session_id, "user", &answer)
                 .await?;
@@ -220,7 +226,7 @@ async fn agent_loop(
                     });
 
                     let (approved, remember) =
-                        wait_for_permission(&cmd_rx, &cancel_token, req.id).await?;
+                        wait_for_permission(&mut cmd_rx, &cancel_token, req.id).await?;
 
                     if remember {
                         permission_engine
@@ -267,7 +273,7 @@ async fn agent_loop(
 
 /// Block until the user answers a question.
 async fn wait_for_answer(
-    cmd_rx: &Arc<Mutex<mpsc::Receiver<AgentCommand>>>,
+    cmd_rx: &mut mpsc::Receiver<AgentCommand>,
     cancel_token: &CancellationToken,
 ) -> Result<String> {
     loop {
@@ -275,7 +281,7 @@ async fn wait_for_answer(
             _ = cancel_token.cancelled() => {
                 anyhow::bail!("Cancelled while waiting for user answer");
             }
-            cmd = async { cmd_rx.lock().await.recv().await } => {
+            cmd = cmd_rx.recv() => {
                 match cmd {
                     Some(AgentCommand::AnswerQuestion { response }) => return Ok(response),
                     Some(AgentCommand::Stop) => anyhow::bail!("Stopped by user"),
@@ -288,7 +294,7 @@ async fn wait_for_answer(
 
 /// Block until the user approves/denies a permission request.
 async fn wait_for_permission(
-    cmd_rx: &Arc<Mutex<mpsc::Receiver<AgentCommand>>>,
+    cmd_rx: &mut mpsc::Receiver<AgentCommand>,
     cancel_token: &CancellationToken,
     _request_id: Uuid,
 ) -> Result<(bool, bool)> {
@@ -297,7 +303,7 @@ async fn wait_for_permission(
             _ = cancel_token.cancelled() => {
                 anyhow::bail!("Cancelled while waiting for permission");
             }
-            cmd = async { cmd_rx.lock().await.recv().await } => {
+            cmd = cmd_rx.recv() => {
                 match cmd {
                     Some(AgentCommand::ApprovePermission { approved, remember, .. }) => {
                         return Ok((approved, remember));

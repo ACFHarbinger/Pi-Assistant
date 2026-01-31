@@ -9,9 +9,20 @@ import Settings from "./components/Settings";
 import { useState, useEffect } from "react";
 
 function App() {
-    const { state } = useAgentStore();
+    const { state, setupListeners } = useAgentStore();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isHatched, setIsHatched] = useState<boolean | null>(null);
+
+    // Initialize listeners
+    useEffect(() => {
+        let unlisten: (() => void) | undefined;
+        setupListeners().then(fn => {
+            unlisten = fn;
+        });
+        return () => {
+            if (unlisten) unlisten();
+        };
+    }, []);
 
     // Check if hatching has been completed
     useEffect(() => {
@@ -113,6 +124,7 @@ function getStateLabel(state: any): string {
     if (state.status === "Running") return "Running";
     if (state.status === "Paused") return state.data?.question ? "Waiting for Input" : "Paused";
     if (state.status === "Stopped") return state.data?.reason || "Stopped";
+    if (state.status === "AssistantMessage") return "Responding...";
     return "Unknown";
 }
 

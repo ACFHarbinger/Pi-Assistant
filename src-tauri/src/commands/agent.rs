@@ -10,12 +10,16 @@ pub async fn start_agent(
     state: State<'_, AppState>,
     task: String,
     max_iterations: Option<u32>,
+    provider: Option<String>,
+    model_id: Option<String>,
 ) -> Result<(), String> {
     state
         .agent_cmd_tx
         .send(AgentCommand::Start {
             task,
             max_iterations,
+            provider,
+            model_id,
         })
         .await
         .map_err(|e| format!("Failed to send start command: {}", e))?;

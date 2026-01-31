@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
 
 export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'marketplace' | 'reset'>('mcp');
+    const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'auth' | 'marketplace' | 'reset'>('mcp');
     const [mcpConfig, setMcpConfig] = useState<any>({});
     const [toolsConfig, setToolsConfig] = useState<any>({});
     const [modelsConfig, setModelsConfig] = useState<any>({ models: [] });
@@ -92,6 +92,17 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
         }
     }
 
+    async function handleLogin(provider: string) {
+        try {
+            const code = await invoke('start_oauth', { provider, clientId: '' });
+            await invoke('exchange_oauth_code', { provider, code, clientId: '', clientSecret: '', redirectUri: '' });
+            alert(`Login to ${provider} successful!`);
+        } catch (e) {
+            console.error(e);
+            alert(`Login failed: ${e}`);
+        }
+    }
+
     async function handleReset() {
         const count = Object.values(resetOptions).filter(Boolean).length;
         if (count === 0) return;
@@ -157,6 +168,7 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                     <TabButton active={activeTab === 'marketplace'} onClick={() => setActiveTab('marketplace')}>Marketplace</TabButton>
                     <TabButton active={activeTab === 'tools'} onClick={() => setActiveTab('tools')}>Tools</TabButton>
                     <TabButton active={activeTab === 'models'} onClick={() => setActiveTab('models')}>Models</TabButton>
+                    <TabButton active={activeTab === 'auth'} onClick={() => setActiveTab('auth')}>Auth</TabButton>
                     <TabButton active={activeTab === 'reset'} onClick={() => setActiveTab('reset')} className="text-red-500!">Reset</TabButton>
                 </div>
 
@@ -288,6 +300,35 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                                 <div className="flex gap-2">
                                     <input className="flex-1 border p-2 rounded dark:bg-zinc-800 dark:text-white" placeholder="HuggingFace ID or Path" value={newModelId} onChange={e => setNewModelId(e.target.value)} />
                                     <button onClick={handleAddModel} className="bg-blue-600 text-white px-4 rounded">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'auth' && (
+                        <div className="space-y-6">
+                            <h3 className="font-bold dark:text-white">Authentication Providers</h3>
+                            <div className="grid gap-4">
+                                <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded flex justify-between items-center">
+                                    <div>
+                                        <div className="font-bold dark:text-white">Google Antigravity</div>
+                                        <div className="text-sm text-zinc-500">Official Cloud Code Assist (Internal)</div>
+                                    </div>
+                                    <button onClick={() => handleLogin('antigravity')} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Login</button>
+                                </div>
+                                <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded flex justify-between items-center">
+                                    <div>
+                                        <div className="font-bold dark:text-white">Google Gemini</div>
+                                        <div className="text-sm text-zinc-500">Standard Generative Language API</div>
+                                    </div>
+                                    <button onClick={() => handleLogin('gemini')} className="bg-zinc-200 dark:bg-zinc-700 dark:text-white px-4 py-2 rounded hover:bg-zinc-300 dark:hover:bg-zinc-600">Login</button>
+                                </div>
+                                <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded flex justify-between items-center">
+                                    <div>
+                                        <div className="font-bold dark:text-white">Anthropic</div>
+                                        <div className="text-sm text-zinc-500">Claude API</div>
+                                    </div>
+                                    <button onClick={() => handleLogin('anthropic')} className="bg-zinc-200 dark:bg-zinc-700 dark:text-white px-4 py-2 rounded hover:bg-zinc-300 dark:hover:bg-zinc-600">Login</button>
                                 </div>
                             </div>
                         </div>

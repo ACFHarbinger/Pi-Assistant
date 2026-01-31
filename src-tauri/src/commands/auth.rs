@@ -1,5 +1,6 @@
 use axum::{extract::Query, response::Html, routing::get, Router};
 use serde::Deserialize;
+use std::error::Error;
 use std::sync::Arc;
 use tauri_plugin_shell::ShellExt;
 use tokio::sync::{oneshot, Mutex};
@@ -23,7 +24,8 @@ pub async fn start_oauth(
 ) -> Result<String, String> {
     // 1. Determine Auth URL
     let is_antigravity = provider == "antigravity"
-        || (provider == "gemini" && client_id.as_deref().unwrap_or("").is_empty());
+        || ((provider == "gemini" || provider == "google")
+            && client_id.as_deref().unwrap_or("").is_empty());
 
     let (auth_base, actual_client_id, scope) = match provider.as_str() {
         "google" | "gemini" | "antigravity" => {
@@ -49,6 +51,14 @@ pub async fn start_oauth(
         ),
         _ => return Err("Unsupported provider".into()),
     };
+
+    // Check if client_id is still empty
+    if actual_client_id.is_empty() {
+        return Err(format!(
+            "Client ID is required for provider '{}' when not using internal credentials.",
+            provider
+        ));
+    }
 
     // 2. Setup loopback server
     let (tx, rx) = oneshot::channel();
@@ -146,7 +156,8 @@ pub async fn exchange_oauth_code(
     redirect_uri: Option<String>,
 ) -> Result<(), String> {
     let is_antigravity = provider == "antigravity"
-        || (provider == "gemini" && client_id.as_deref().unwrap_or("").is_empty());
+        || ((provider == "gemini" || provider == "google")
+            && client_id.as_deref().unwrap_or("").is_empty());
 
     let (token_url, actual_client_id, actual_client_secret, actual_redirect_uri) =
         match provider.as_str() {
@@ -179,24 +190,95 @@ pub async fn exchange_oauth_code(
             _ => return Err("Unsupported provider".into()),
         };
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .unwrap_or_default();
     let mut params = HashMap::new();
-    params.insert("client_id", actual_client_id);
-    params.insert("client_secret", actual_client_secret);
-    params.insert("code", code);
-    params.insert("grant_type", "authorization_code".into());
-    params.insert("redirect_uri", actual_redirect_uri);
+    params.insert("client_id", actual_client_id.clone());
+    params.insert("client_secret", actual_client_secret.clone());
+    params.insert("code", code.clone());
+    params.insert("grant_type", "authorization_code".to_string());
+    params.insert("redirect_uri", actual_redirect_uri.clone());
 
     let res = client
         .post(token_url)
         .form(&params)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            let mut msg = format!("Request failed: {}", e);
+            if let Some(s) = e.source() {
+                msg.push_str(&format!("\nCaused by: {}", s));
+            }
+            msg
+        });
 
-    if !res.status().is_success() {
+    let res = match res {
+        Ok(r) => r,
+        Err(reqwest_err) => {
+            println!("Reqwest failed, trying curl fallback: {}", reqwest_err);
+            // Fallback to curl
+            let status = std::process::Command::new("curl")
+                .env_remove("HTTP_PROXY")
+                .env_remove("http_proxy")
+                .env_remove("HTTPS_PROXY")
+                .env_remove("https_proxy")
+                .env_remove("ALL_PROXY")
+                .env_remove("all_proxy")
+                .arg("-v")
+                .arg("-4")
+                .arg("-X")
+                .arg("POST")
+                .arg(&token_url)
+                .arg("-d")
+                .arg(format!("code={}", code))
+                .arg("-d")
+                .arg(format!("client_id={}", actual_client_id))
+                .arg("-d")
+                .arg(format!("client_secret={}", actual_client_secret))
+                .arg("-d")
+                .arg(format!("redirect_uri={}", actual_redirect_uri))
+                .arg("-d")
+                .arg("grant_type=authorization_code")
+                .output()
+                .map_err(|e| {
+                    format!(
+                        "Curl fallback execution failed: {}\nOriginal error: {}",
+                        e, reqwest_err
+                    )
+                })?;
+
+            if !status.status.success() {
+                let stderr = String::from_utf8_lossy(&status.stderr);
+                return Err(format!(
+                    "Curl failed with status {}: {}\nOriginal: {}",
+                    status.status, stderr, reqwest_err
+                ));
+            }
+
+            let stdout = String::from_utf8_lossy(&status.stdout);
+            let tokens: TokenResponse = serde_json::from_str(&stdout).map_err(|e| {
+                format!("Failed to parse curl response: {}\nResponse: {}", e, stdout)
+            })?;
+
+            crate::commands::config::save_api_key(
+                format!("{}_oauth", provider),
+                tokens.access_token,
+            )
+            .await?;
+            if let Some(refresh) = tokens.refresh_token {
+                crate::commands::config::save_api_key(format!("{}_refresh", provider), refresh)
+                    .await?;
+            }
+            return Ok(());
+        }
+    };
+
+    let status = res.status();
+    if !status.is_success() {
         let err = res.text().await.unwrap_or_default();
-        return Err(format!("Token exchange failed: {}", err));
+        return Err(format!("Token exchange failed ({}): {}", status, err));
     }
 
     let tokens: TokenResponse = res.json().await.map_err(|e| e.to_string())?;

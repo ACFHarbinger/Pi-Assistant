@@ -1,5 +1,6 @@
 //! Pi-Assistant library - Tauri application setup and state management.
 
+use tauri::Emitter;
 use tauri::Manager;
 
 pub mod agent;
@@ -29,9 +30,38 @@ pub fn run() {
         .setup(|app| {
             tauri::async_runtime::block_on(async {
                 let state = state::AppState::new().await;
+                let sidecar = state.sidecar.clone();
+                let tool_registry = state.tool_registry.clone();
+                let memory = state.memory.clone();
+                let permissions = state.permissions.clone();
+                let agent_cmd_rx = state.agent_cmd_rx.clone();
+                let agent_state_tx = state.agent_state_tx.clone();
+
+                tauri::async_runtime::spawn(async move {
+                    agent::spawn_agent_monitor(
+                        agent_state_tx,
+                        agent_cmd_rx,
+                        tool_registry,
+                        memory,
+                        sidecar,
+                        permissions,
+                    )
+                    .await;
+                });
+
+                // Bridge AgentState to Tauri events
+                let mut state_rx = state.agent_state_rx.clone();
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    while state_rx.changed().await.is_ok() {
+                        let state = state_rx.borrow().clone();
+                        let _ = app_handle.emit("agent-state-changed", state);
+                    }
+                });
+
                 app.manage(state);
             });
-            tracing::info!("Application state initialized");
+            tracing::info!("Application state and agent monitor initialized");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

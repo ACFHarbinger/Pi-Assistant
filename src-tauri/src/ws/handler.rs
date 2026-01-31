@@ -168,6 +168,8 @@ async fn handle_client_message(
                 } => AgentCommand::Start {
                     task,
                     max_iterations,
+                    provider: None,
+                    model_id: None,
                 },
                 ClientCommand::Stop => AgentCommand::Stop,
                 ClientCommand::Pause => AgentCommand::Pause,

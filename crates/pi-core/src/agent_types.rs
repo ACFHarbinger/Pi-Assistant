@@ -21,6 +21,9 @@ pub enum AgentState {
         task_id: Uuid,
         reason: StopReason,
     },
+    AssistantMessage {
+        content: String,
+    },
 }
 
 impl Default for AgentState {
@@ -54,6 +57,8 @@ pub enum AgentCommand {
     Start {
         task: String,
         max_iterations: Option<u32>,
+        provider: Option<String>,
+        model_id: Option<String>,
     },
     Stop,
     Pause,
@@ -65,6 +70,11 @@ pub enum AgentCommand {
         request_id: Uuid,
         approved: bool,
         remember: bool,
+    },
+    ChatMessage {
+        content: String,
+        provider: Option<String>,
+        model_id: Option<String>,
     },
 }
 

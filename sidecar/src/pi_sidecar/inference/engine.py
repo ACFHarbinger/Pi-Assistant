@@ -98,7 +98,7 @@ class InferenceEngine:
         """
         if provider == "anthropic":
             return await self._complete_anthropic(prompt, model_id, max_tokens, temperature)
-        elif provider == "gemini":
+        elif provider == "google":
             return await self._complete_gemini(prompt, model_id, max_tokens, temperature)
         else:
             return await self._complete_local(prompt, model_id, max_tokens, temperature)
@@ -239,56 +239,128 @@ Available tools: shell, code, browser"""
         self, prompt: str, model_id: str | None, max_tokens: int, temperature: float
     ) -> dict[str, Any]:
         """
-        Complete using Google Gemini with OAuth.
-        Args:
-            prompt: The prompt to use for text completion.
-            model_id: The model ID to use for text completion.
-            max_tokens: The maximum number of tokens to generate.
-            temperature: The temperature to use for text completion.
-        Returns:
-            A dictionary containing the text completion.
+        Complete using Google Antigravity (Cloud Code Assist API) with OAuth.
+        
+        This mimics the `opencode-antigravity-auth` plugin behavior:
+        - Endpoint: daily-cloudcode-pa.sandbox.googleapis.com
+        - Headers: Specific User-Agent and Client-Metadata
+        - Payload: Uppercase types
         """
-        if self._gemini_client is None:
-            import google.generativeai as genai
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            # Try loading from secrets.json
+            secrets_path = Path.home() / ".pi-assistant" / "secrets.json"
+            if secrets_path.exists():
+                import json
+                try:
+                    with open(secrets_path, "r") as f:
+                        secrets = json.load(f)
+                        api_key = (
+                            secrets.get("antigravity_oauth")
+                            or secrets.get("google_oauth")
+                            or secrets.get("gemini_oauth")
+                            or secrets.get("google")
+                            or secrets.get("gemini")
+                        )
+                except Exception as e:
+                    logger.error("Failed to load secrets: %s", e)
 
-            # Check for API key or OAuth credentials
-            api_key = os.getenv("GOOGLE_API_KEY")
-            if not api_key:
-                 # Try loading from secrets.json
-                secrets_path = Path.home() / ".pi-assistant" / "secrets.json"
-                if secrets_path.exists():
-                    import json
-                    try:
-                        with open(secrets_path, "r") as f:
-                            secrets = json.load(f)
-                            api_key = secrets.get("gemini") or secrets.get("google_oauth") or secrets.get("gemini_oauth")
-                    except Exception as e:
-                        logger.error("Failed to load secrets: %s", e)
-
-            if api_key:
-                genai.configure(api_key=api_key)
-            else:
-                # OAuth flow would be configured here
-                raise ValueError(
-                    "GOOGLE_API_KEY environment variable not set and no secret found. "
-                    "OAuth flow not yet implemented."
-                )
-            self._gemini_client = genai
+        if not api_key:
+            raise ValueError("No Google OAuth token found in secrets.json")
 
         model_name = model_id or "gemini-2.0-flash"
-        logger.info("Calling Gemini: %s", model_name)
-
-        model = self._gemini_client.GenerativeModel(model_name)
-        response = await model.generate_content_async(
-            prompt,
-            generation_config={"max_output_tokens": max_tokens, "temperature": temperature},
-        )
-
-        return {
-            "text": response.text,
-            "provider": "gemini",
-            "model": model_name,
+        
+        # Antigravity Logic
+        # See reversed logic from opencode-antigravity-auth
+        base_url = "https://daily-cloudcode-pa.sandbox.googleapis.com"
+        endpoint = f"{base_url}/v1internal:generateContent"
+        
+        # Headers from constants.js (Antigravity/1.15.8)
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Antigravity/1.15.8 Chrome/138.0.7204.235 Electron/37.3.1 Safari/537.36",
+            "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
+            "Client-Metadata": '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}',
         }
+
+        # Antigravity Model Mapping
+        model_map = {
+            "gemini-3-flash": "gemini-3-pro-low",
+            "gemini-2.0-flash": "gemini-3-pro-low",
+            "claude-3-5-sonnet": "claude-sonnet-4-5",
+            # Add other mappings as needed
+        }
+        
+        target_model = model_map.get(model_name, model_name)
+        
+        # Payload construction
+        # Antigravity expects a wrapped "request" object
+        import time
+        payload = {
+            "project": "rising-fact-p41fc", # Sandbox default
+            "model": target_model,
+            "request": {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": prompt}]
+                    }
+                ],
+                "generationConfig": {
+                    "maxOutputTokens": max_tokens,
+                    "temperature": temperature,
+                    "candidateCount": 1
+                }
+            },
+            "requestType": "agent",
+            "userAgent": "antigravity",
+            "requestId": f"agent-{int(time.time()*1000)}"
+        }
+        
+        # Add system instruction if personality is available (implicit) or passed
+        # Currently prompt includes system prompt, but Antigravity separates it.
+        # For now, we keep it simple as prompt is merged. 
+        # But if we were to split it:
+        # payload["request"]["systemInstruction"] = { "parts": [{ "text": system_prompt }] }
+
+        logger.info(f"Calling Antigravity: {endpoint} model={model_name}")
+
+        import httpx
+        async with httpx.AsyncClient(trust_env=False) as client:
+            try:
+                response = await client.post(endpoint, json=payload, headers=headers, timeout=60.0)
+                
+                if response.status_code != 200:
+                    error_text = response.text
+                    logger.error(f"Antigravity API Error {response.status_code}: {error_text}")
+                    raise ValueError(f"Antigravity API Error {response.status_code}: {error_text}")
+                
+                data = response.json()
+                
+                # Parse response (standard Gemini format)
+                # candidates[0].content.parts[0].text
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    return {"text": "", "provider": "gemini", "model": model_name}
+                
+                content = candidates[0].get("content", {})
+                parts = content.get("parts", [])
+                text = "".join(part.get("text", "") for part in parts)
+                
+                return {
+                    "text": text,
+                    "provider": "gemini",
+                    "model": model_name,
+                    "usage": {
+                        "input_tokens": 0, # Not always returned
+                        "output_tokens": 0
+                    }
+                }
+                
+            except Exception as e:
+                logger.error(f"Antigravity call failed: {e}")
+                raise
 
     async def _complete_local(
         self, prompt: str, model_id: str | None, max_tokens: int, temperature: float
