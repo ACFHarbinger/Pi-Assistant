@@ -38,6 +38,8 @@ class RequestHandler:
             "model.list": self._model_list,
             "model.load": self._model_load,
             "inference.load_model": self._inference_load_model,
+            "personality.get_hatching": self._personality_get_hatching,
+            "personality.get_prompt": self._personality_get_prompt,
         }
 
     async def dispatch(
@@ -171,3 +173,25 @@ class RequestHandler:
         """
         await self.registry.load_model(params["model_id"])
         return {"status": "loaded", "model_id": params["model_id"]}
+
+    # ── Personality handlers ─────────────────────────────────────
+
+    async def _personality_get_hatching(self, params, _cb):
+        """
+        Get the hatching (first-run) message from personality.
+        Returns:
+            A dictionary containing the hatching message.
+        """
+        from pi_sidecar.personality import get_personality
+        personality = get_personality()
+        return {"message": personality.hatching_message}
+
+    async def _personality_get_prompt(self, params, _cb):
+        """
+        Get the personality system prompt.
+        Returns:
+            A dictionary containing the personality prompt.
+        """
+        from pi_sidecar.personality import get_personality
+        personality = get_personality()
+        return {"prompt": personality.system_prompt}

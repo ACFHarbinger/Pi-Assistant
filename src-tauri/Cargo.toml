@@ -39,6 +39,11 @@ regex = "1"
 dirs = "5"
 base64 = "0.22"
 url = "2"
+teloxide = { version = "0.14", default-features = false, features = [
+    "macros",
+    "rustls",
+    "ctrlc_handler",
+] }
 
 # Internal crates
 pi-core.workspace = true

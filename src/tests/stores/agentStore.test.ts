@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAgentStore } from '../../stores/agentStore';
-import { invoke } from '@tauri-apps/api/core';
 
 // Mock Tauri invoke
 const mockInvoke = vi.fn();

@@ -13,6 +13,7 @@ import os
 from typing import Any
 
 from pi_sidecar.models.registry import ModelRegistry
+from pi_sidecar.personality import get_personality
 
 logger = logging.getLogger(__name__)
 
@@ -92,20 +93,28 @@ class InferenceEngine:
         Returns:
             A dictionary containing the agent plan.
         """
-        system_prompt = """You are an AI agent planner. Given a task and context, decide:
-            1. What tools to call (if any)
-            2. Whether to ask the user a question
-            3. Whether the task is complete
+        # Get personality-aware base prompt
+        personality = get_personality()
+        personality_prompt = personality.system_prompt
+        
+        system_prompt = f"""{personality_prompt}
 
-            Respond with JSON:
-            {
-                "reasoning": "your chain of thought",
-                "tool_calls": [{"tool_name": "...", "parameters": {...}}],
-                "question": "optional question for user",
-                "is_complete": false
-            }
+# Agent Planner Instructions
 
-            Available tools: shell, code, browser"""
+Given a task and context, decide:
+1. What tools to call (if any)
+2. Whether to ask the user a question
+3. Whether the task is complete
+
+Respond with JSON:
+{{
+    "reasoning": "your chain of thought",
+    "tool_calls": [{{"tool_name": "...", "parameters": {{...}}}}],
+    "question": "optional question for user",
+    "is_complete": false
+}}
+
+Available tools: shell, code, browser"""
 
         context_str = "\n".join(
             f"[{c.get('role', 'system')}]: {c.get('content', '')}" for c in context

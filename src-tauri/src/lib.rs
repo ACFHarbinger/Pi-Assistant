@@ -3,6 +3,7 @@
 use tauri::Manager;
 
 pub mod agent;
+pub mod channels;
 pub mod commands;
 pub mod ipc;
 pub mod mcp;
@@ -50,6 +51,7 @@ pub fn run() {
             commands::config::save_model,
             commands::config::load_model,
             commands::config::get_mcp_marketplace,
+            commands::sidecar::sidecar_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -3,13 +3,39 @@ import { AgentStatus } from "./components/AgentStatus";
 import { ChatInterface } from "./components/ChatInterface.tsx";
 import { TaskInput } from "./components/TaskInput.tsx";
 import { PermissionDialog } from "./components/PermissionDialog.tsx";
+import { HatchingExperience } from "./components/HatchingExperience.tsx";
 
 import Settings from "./components/Settings";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 function App() {
     const { state } = useAgentStore();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isHatched, setIsHatched] = useState<boolean | null>(null);
+
+    // Check if hatching has been completed
+    useEffect(() => {
+        const hatched = localStorage.getItem('pi-hatched') === 'true';
+        console.log('App: Hatching state check:', hatched);
+        setIsHatched(hatched);
+    }, []);
+
+    console.log('App: Current state:', { status: state.status, isHatched });
+
+    // Show hatching experience if not yet hatched
+    if (isHatched === null) {
+        console.log('App: State is null, showing loading spinner');
+        return (
+            <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+                <div className="text-primary-500 animate-spin text-4xl">⏳</div>
+            </div>
+        );
+    }
+
+    if (!isHatched) {
+        console.log('App: Not hatched, showing HatchingExperience');
+        return <HatchingExperience onComplete={() => setIsHatched(true)} />;
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">

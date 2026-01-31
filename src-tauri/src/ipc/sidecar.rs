@@ -98,9 +98,23 @@ impl SidecarHandle {
 
         info!(python = %self.python_path, module = %self.sidecar_module, "Starting Python sidecar");
 
+        // Resolve absolute path to sidecar source for development
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let sidecar_path = if cwd.join("sidecar/src").exists() {
+            cwd.join("sidecar/src")
+        } else if cwd.join("../sidecar/src").exists() {
+            cwd.join("../sidecar/src")
+        } else {
+            // Fallback to relative
+            std::path::PathBuf::from("../sidecar/src")
+        };
+
+        info!("Setting PYTHONPATH to: {:?}", sidecar_path);
+
         let mut child = Command::new(&self.python_path)
             .arg("-m")
             .arg(&self.sidecar_module)
+            .env("PYTHONPATH", sidecar_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit()) // Log to console
@@ -162,10 +176,14 @@ impl SidecarHandle {
             info!("Sidecar stdout closed");
         });
 
-        // Health check (use raw request to avoid recursion)
-        let health = self
-            .send_raw_request("health.ping", serde_json::json!({}))
-            .await?;
+        // Health check (5s timeout)
+        let health = tokio::time::timeout(
+            tokio::time::Duration::from_secs(5),
+            self.send_raw_request("health.ping", serde_json::json!({})),
+        )
+        .await
+        .map_err(|_| anyhow!("Health check timed out"))??;
+
         info!(response = ?health, "Sidecar health check passed");
 
         Ok(())

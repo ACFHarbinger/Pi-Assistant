@@ -2,26 +2,6 @@ import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-shell';
 
-interface McpServerConfig {
-    command: string;
-    args: string[];
-    env: Record<string, string>;
-}
-
-interface ToolsConfig {
-    enabled_tools: Record<string, boolean>;
-}
-
-interface ModelInfo {
-    id: string;
-    path?: string;
-    description?: string;
-}
-
-interface ModelsConfig {
-    models: ModelInfo[];
-}
-
 export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
     const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'marketplace'>('mcp');
     const [mcpConfig, setMcpConfig] = useState<any>({});

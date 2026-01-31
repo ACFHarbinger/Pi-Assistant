@@ -13,14 +13,13 @@ dependencies = [
     "pytorch-lightning>=2.4.0",
     "transformers>=4.47.0",
     "sentence-transformers>=3.4.0",
-
     # LLM Providers
     "anthropic>=0.42.0",
     "google-generativeai>=0.8.0",
-
     # Utilities
     "pydantic>=2.10.0",
     "aiofiles>=24.1.0",
+    "numpy>=2.4.1",
 ]
 
 [project.optional-dependencies]
