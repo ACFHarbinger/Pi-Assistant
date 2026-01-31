@@ -97,6 +97,12 @@ impl std::ops::Deref for SendSafeStream {
     }
 }
 
+impl Default for AudioRecorder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AudioRecorder {
     pub fn new() -> Self {
         #[cfg(target_os = "linux")]
@@ -117,10 +123,10 @@ impl AudioRecorder {
             #[cfg(target_os = "linux")]
             let _silence = SilenceStderr::new();
 
-            let devices = host.input_devices()?;
+            let mut devices = host.input_devices()?;
 
             devices
-                .filter(|d| {
+                .find(|d| {
                     d.name()
                         .map(|n| {
                             let name = n.to_lowercase();
@@ -132,7 +138,6 @@ impl AudioRecorder {
                         })
                         .unwrap_or(false)
                 })
-                .next()
                 .or_else(|| host.default_input_device())
                 .ok_or_else(|| anyhow!("No suitable input device found"))?
         };

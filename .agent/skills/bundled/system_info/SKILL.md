@@ -13,26 +13,31 @@ Provides commands to query system state.
 When the user asks about system resources, use the shell tool with these commands:
 
 ### Disk Usage
+
 ```bash
 df -h
 ```
 
 ### Memory Usage
+
 ```bash
 free -h
 ```
 
 ### CPU Information
+
 ```bash
 lscpu | head -20
 ```
 
 ### Running Processes
+
 ```bash
 ps aux --sort=-%mem | head -15
 ```
 
 ### System Uptime
+
 ```bash
 uptime
 ```

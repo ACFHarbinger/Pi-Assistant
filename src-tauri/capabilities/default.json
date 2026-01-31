@@ -1,11 +1,6 @@
 {
   "identifier": "default",
   "description": "Default capabilities for the app",
-  "windows": [
-    "*"
-  ],
-  "permissions": [
-    "core:default",
-    "shell:allow-open"
-  ]
+  "windows": ["*"],
+  "permissions": ["core:default", "shell:allow-open"]
 }

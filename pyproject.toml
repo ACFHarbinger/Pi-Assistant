@@ -32,5 +32,6 @@ pi-sidecar-logic = { workspace = true }
 dev = [
     "black>=26.1.0",
     "mypy>=1.19.1",
+    "pytest>=9.0.2",
     "ruff>=0.14.14",
 ]

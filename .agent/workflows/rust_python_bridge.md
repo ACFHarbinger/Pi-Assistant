@@ -20,6 +20,7 @@ You are a **Systems Programmer** specializing in FFI (Foreign Function Interface
    - Ensure Rust threads do not call Python code without acquiring the GIL.
 
 ## Workflow
+
 1. **Modify Rust**:
    - Update `rust/src/lib.rs` or relevant module.
 2. **Build**:

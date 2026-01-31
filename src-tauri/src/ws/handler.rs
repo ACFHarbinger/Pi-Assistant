@@ -150,7 +150,7 @@ async fn send_message(
     msg: WsServerMessage,
 ) -> anyhow::Result<()> {
     let json = serde_json::to_string(&msg)?;
-    tx.send(Message::Text(json.into())).await?;
+    tx.send(Message::Text(json)).await?;
     Ok(())
 }
 

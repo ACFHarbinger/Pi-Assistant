@@ -9,6 +9,7 @@ I need to implement a new feature: `[INSERT FEATURE NAME]`.
 **Dependencies:** [List relevant tabs, backend modules, or Rust functions].
 
 **Strict Constraints:**
+
 1. **Separation**: If it involves heavy pixel logic -> `base/`. If it's UI -> `gui/` or `frontend/`.
 2. **Concurrency**: All long-running tasks must go into `gui/src/helpers/`.
 3. **Database**: Updates to schema must use `pgvector` compatible migrations.

@@ -40,6 +40,14 @@ pub struct AgentPlan {
     pub reasoning: String,
 }
 
+/// Resources shared by the agent loop.
+pub struct AgentResources {
+    pub tool_registry: Arc<RwLock<ToolRegistry>>,
+    pub memory: Arc<MemoryManager>,
+    pub ml_sidecar: Arc<Mutex<SidecarHandle>>,
+    pub permission_engine: Arc<Mutex<PermissionEngine>>,
+}
+
 /// Spawn the agent loop as a background Tokio task.
 pub fn spawn_agent_loop(
     task: AgentTask,
@@ -53,19 +61,15 @@ pub fn spawn_agent_loop(
     let token = cancel_token.clone();
     let (cmd_tx, cmd_rx) = mpsc::channel(32);
 
-    let join_handle = tokio::spawn(async move {
-        agent_loop(
-            task,
-            state_tx,
-            cmd_rx,
-            tool_registry,
-            memory,
-            ml_sidecar,
-            permission_engine,
-            token,
-        )
-        .await
-    });
+    let resources = AgentResources {
+        tool_registry,
+        memory,
+        ml_sidecar,
+        permission_engine,
+    };
+
+    let join_handle =
+        tokio::spawn(async move { agent_loop(task, state_tx, cmd_rx, resources, token).await });
 
     AgentLoopHandle {
         cancel_token,
@@ -78,10 +82,7 @@ async fn agent_loop(
     task: AgentTask,
     state_tx: watch::Sender<AgentState>,
     mut cmd_rx: mpsc::Receiver<AgentCommand>,
-    tool_registry: Arc<RwLock<ToolRegistry>>,
-    memory: Arc<MemoryManager>,
-    ml_sidecar: Arc<Mutex<SidecarHandle>>,
-    permission_engine: Arc<Mutex<PermissionEngine>>,
+    resources: AgentResources,
     cancel_token: CancellationToken,
 ) -> Result<StopReason> {
     info!(task_id = %task.id, "Agent loop started: {}", task.description);
@@ -153,21 +154,25 @@ async fn agent_loop(
                 }
                 AgentCommand::ChannelMessage { text, .. } => {
                     // Store in memory so next iteration sees it
-                    let _ = memory.store_message(&task.session_id, "user", &text).await;
+                    let _ = resources
+                        .memory
+                        .store_message(&task.session_id, "user", &text)
+                        .await;
                 }
                 _ => {}
             }
         }
 
         // ── 1. Retrieve relevant context from memory ─────────────────
-        let context = memory
+        let context = resources
+            .memory
             .retrieve_context(&task.description, &task.session_id, 10)
             .await?;
 
         // ── 2. Plan next step (LLM call via sidecar) ─────────────────
-        let tools = tool_registry.read().await.list_tools();
+        let tools = resources.tool_registry.read().await.list_tools();
         let plan = {
-            let mut sidecar = ml_sidecar.lock().await;
+            let mut sidecar = resources.ml_sidecar.lock().await;
             let response = sidecar
                 .request(
                     "inference.plan",
@@ -200,7 +205,8 @@ async fn agent_loop(
             });
 
             let answer = wait_for_answer(&mut cmd_rx, &cancel_token).await?;
-            memory
+            resources
+                .memory
                 .store_message(&task.session_id, "user", &answer)
                 .await?;
 
@@ -212,7 +218,7 @@ async fn agent_loop(
 
         // ── 4. Execute each tool call with permission checks ─────────
         for tool_call in &plan.tool_calls {
-            let permission = permission_engine.lock().await.check(tool_call)?;
+            let permission = resources.permission_engine.lock().await.check(tool_call)?;
 
             match permission {
                 PermissionResult::Allowed => {}
@@ -235,7 +241,8 @@ async fn agent_loop(
                         wait_for_permission(&mut cmd_rx, &cancel_token, req.id).await?;
 
                     if remember {
-                        permission_engine
+                        resources
+                            .permission_engine
                             .lock()
                             .await
                             .add_user_override(&tool_call.pattern_key(), approved);
@@ -257,8 +264,14 @@ async fn agent_loop(
                 }
             }
 
-            let result = tool_registry.read().await.execute(tool_call).await?;
-            memory
+            let result = resources
+                .tool_registry
+                .read()
+                .await
+                .execute(tool_call)
+                .await?;
+            resources
+                .memory
                 .store_tool_result(&task.id, tool_call, &result)
                 .await?;
         }

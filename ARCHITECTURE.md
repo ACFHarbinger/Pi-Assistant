@@ -89,13 +89,14 @@ Android App                    Rust Server                    Agent Loop
 
 Memory serves two purposes: **structured recall** (what happened, in order) and **semantic search** (find relevant context by meaning).
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Structured | SQLite (`rusqlite`, bundled) | Sessions, messages, tasks, tool logs, permission cache |
-| Semantic | `sqlite-vec` extension | Vector similarity search over embeddings |
-| Embeddings | Python sidecar (`all-MiniLM-L6-v2`, 384-dim) | Generate vectors from text |
+| Layer      | Technology                                   | Purpose                                                |
+| ---------- | -------------------------------------------- | ------------------------------------------------------ |
+| Structured | SQLite (`rusqlite`, bundled)                 | Sessions, messages, tasks, tool logs, permission cache |
+| Semantic   | `sqlite-vec` extension                       | Vector similarity search over embeddings               |
+| Embeddings | Python sidecar (`all-MiniLM-L6-v2`, 384-dim) | Generate vectors from text                             |
 
 **Retrieval flow per agent iteration:**
+
 1. Build a query string from the current task description + recent context.
 2. Send to Python sidecar `inference.embed` -> get 384-dim vector.
 3. Query `sqlite-vec` for top-K similar memories.
@@ -1668,11 +1669,11 @@ class SpeechRecognizerHelper(context: Context) {
 
 Every tool call passes through the `PermissionEngine` before execution. Commands are classified into three tiers:
 
-| Tier | Behavior | Examples |
-|------|----------|---------|
-| **Auto-Approve** | Executes immediately, no prompt | `ls`, `cat`, `grep`, `git status`, `git log`, `git diff`, `npm list`, `pip list`, `cargo tree`, `uname`, `whoami`, `date` |
-| **Ask User** | Pauses agent, shows approval dialog on desktop/mobile | `cp`, `mv`, `mkdir`, `git commit`, `git push`, `npm install`, `pip install`, `curl`, `python`, `node`, file writes via `>` or `>>` |
-| **Block** | Silently denied, logged, never executed | `rm -rf /`, `sudo`, `su`, `dd`, `mkfs`, `chmod 777`, editing `/etc/`, `/sys/`, `/proc/`, printing env vars matching `SECRET\|KEY\|TOKEN\|PASSWORD` |
+| Tier             | Behavior                                              | Examples                                                                                                                                           |
+| ---------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Auto-Approve** | Executes immediately, no prompt                       | `ls`, `cat`, `grep`, `git status`, `git log`, `git diff`, `npm list`, `pip list`, `cargo tree`, `uname`, `whoami`, `date`                          |
+| **Ask User**     | Pauses agent, shows approval dialog on desktop/mobile | `cp`, `mv`, `mkdir`, `git commit`, `git push`, `npm install`, `pip install`, `curl`, `python`, `node`, file writes via `>` or `>>`                 |
+| **Block**        | Silently denied, logged, never executed               | `rm -rf /`, `sudo`, `su`, `dd`, `mkfs`, `chmod 777`, editing `/etc/`, `/sys/`, `/proc/`, printing env vars matching `SECRET\|KEY\|TOKEN\|PASSWORD` |
 
 ### PermissionEngine Implementation
 
@@ -1891,52 +1892,51 @@ impl PermissionEngine {
 
 ### Rust (`src-tauri/Cargo.toml`)
 
-| Crate | Version | Purpose |
-|-------|---------|---------|
-| `tauri` | 2.x | App framework |
-| `tauri-plugin-shell` | 2.x | Shell/sidecar access |
-| `tokio` | 1.x | Async runtime (full features) |
-| `tokio-util` | 0.7 | CancellationToken |
-| `axum` | 0.8 | WebSocket server for mobile |
-| `serde` / `serde_json` | 1.x | Serialization |
-| `rusqlite` | 0.32 | SQLite (bundled feature) |
-| `sqlite-vec` | 0.1 | Vector similarity extension |
-| `chromiumoxide` | 0.7 | Headless browser (CDP) |
-| `uuid` | 1.x | Correlation IDs |
-| `regex` | 1.x | Permission pattern matching |
-| `tracing` | 0.1 | Structured logging |
-| `thiserror` | 2.x | Error types |
-| `anyhow` | 1.x | Error handling |
-| `async-trait` | 0.1 | Async trait methods |
+| Crate                  | Version | Purpose                       |
+| ---------------------- | ------- | ----------------------------- |
+| `tauri`                | 2.x     | App framework                 |
+| `tauri-plugin-shell`   | 2.x     | Shell/sidecar access          |
+| `tokio`                | 1.x     | Async runtime (full features) |
+| `tokio-util`           | 0.7     | CancellationToken             |
+| `axum`                 | 0.8     | WebSocket server for mobile   |
+| `serde` / `serde_json` | 1.x     | Serialization                 |
+| `rusqlite`             | 0.32    | SQLite (bundled feature)      |
+| `sqlite-vec`           | 0.1     | Vector similarity extension   |
+| `chromiumoxide`        | 0.7     | Headless browser (CDP)        |
+| `uuid`                 | 1.x     | Correlation IDs               |
+| `regex`                | 1.x     | Permission pattern matching   |
+| `tracing`              | 0.1     | Structured logging            |
+| `thiserror`            | 2.x     | Error types                   |
+| `anyhow`               | 1.x     | Error handling                |
+| `async-trait`          | 0.1     | Async trait methods           |
 
 ### Python (`sidecar/pyproject.toml`)
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `torch` | >=2.2 | Tensor computation |
-| `pytorch-lightning` | >=2.2 | Training framework |
-| `transformers` | >=4.40 | HuggingFace models |
-| `sentence-transformers` | >=3.0 | Embedding models |
-| `pydantic` | >=2.5 | Data validation |
+| Package                 | Version | Purpose            |
+| ----------------------- | ------- | ------------------ |
+| `torch`                 | >=2.2   | Tensor computation |
+| `pytorch-lightning`     | >=2.2   | Training framework |
+| `transformers`          | >=4.40  | HuggingFace models |
+| `sentence-transformers` | >=3.0   | Embedding models   |
+| `pydantic`              | >=2.5   | Data validation    |
 
 ### Android (`android/gradle/libs.versions.toml`)
 
-| Library | Version | Purpose |
-|---------|---------|---------|
-| `okhttp` | 5.0.x | WebSocket client |
-| `kotlinx-serialization-json` | 1.7.x | JSON serialization |
-| `kotlinx-coroutines` | 1.10.x | Async/Flow |
-| `lifecycle-viewmodel-compose` | 2.8.x | ViewModel |
-| `compose-bom` | 2025.x | Jetpack Compose |
+| Library                       | Version | Purpose            |
+| ----------------------------- | ------- | ------------------ |
+| `okhttp`                      | 5.0.x   | WebSocket client   |
+| `kotlinx-serialization-json`  | 1.7.x   | JSON serialization |
+| `kotlinx-coroutines`          | 1.10.x  | Async/Flow         |
+| `lifecycle-viewmodel-compose` | 2.8.x   | ViewModel          |
+| `compose-bom`                 | 2025.x  | Jetpack Compose    |
 
 ### Frontend (`package.json`)
 
-| Package | Purpose |
-|---------|---------|
-| `@tauri-apps/api` | Tauri v2 IPC |
-| `react` / `react-dom` | UI framework |
-| `zustand` | State management |
-| `tailwindcss` | Styling |
-| `react-markdown` | Markdown rendering |
-| `vite` | Build tooling |
-
+| Package               | Purpose            |
+| --------------------- | ------------------ |
+| `@tauri-apps/api`     | Tauri v2 IPC       |
+| `react` / `react-dom` | UI framework       |
+| `zustand`             | State management   |
+| `tailwindcss`         | Styling            |
+| `react-markdown`      | Markdown rendering |
+| `vite`                | Build tooling      |

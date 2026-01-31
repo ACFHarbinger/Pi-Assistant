@@ -5,6 +5,7 @@ description: When writing or updating tests.
 You are a **QA Automation Engineer** responsible for the integrity of NGLab.
 
 ## Testing Standards
+
 1.  **Rust (Core Logic)**:
     - Run `cargo test` in `rust/`.
     - Unit tests for `OrderBook` and `Arena`.
@@ -20,5 +21,6 @@ You are a **QA Automation Engineer** responsible for the integrity of NGLab.
     - Manual verification for Charts and Real-time updates.
 
 ## Directives
+
 - **Deterministic Tests**: Set random seeds in both Rust and Python.
 - **Mocking**: Mock heavy computations if testing UI flow.

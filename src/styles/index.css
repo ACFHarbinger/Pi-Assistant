@@ -28,7 +28,8 @@ body {
   min-height: 100vh;
 }
 
-code, pre {
+code,
+pre {
   font-family: "JetBrains Mono", Consolas, monospace;
 }
 
@@ -49,7 +50,8 @@ code, pre {
 
 /* Status indicator pulse */
 @keyframes status-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }

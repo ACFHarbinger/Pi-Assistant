@@ -7,6 +7,7 @@
 I need to understand the interface between the high-performance Rust core and the Python backend.
 
 Using **Chain-of-Thought reasoning**, analyze the relationship between:
+
 - The Rust bindings in `rust/src/lib.rs` (specifically simulation, arena, or gym env functions).
 - The Python wrapper in `python/src/` (e.g., `trading_env.py` or reinforcement learning agents).
 - The data structures passed: StepInfo, OrderBook snapshots, and NumPy arrays.

@@ -1,39 +1,41 @@
 {
-    "name": "pi-assistant",
-    "version": "0.1.0",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "tsc && vite build",
-        "preview": "vite preview",
-        "tauri": "tauri",
-        "test": "vitest",
-        "format": "prettier --write ."
-    },
-    "dependencies": {
-        "@tauri-apps/api": "^2.2.0",
-        "@tauri-apps/plugin-shell": "^2.2.0",
-        "lucide-react": "^0.563.0",
-        "react": "^18.3.1",
-        "react-dom": "^18.3.1",
-        "zustand": "^5.0.3"
-    },
-    "devDependencies": {
-        "@tauri-apps/cli": "^2.2.0",
-        "@testing-library/jest-dom": "^6.9.1",
-        "@testing-library/react": "^16.3.2",
-        "@types/node": "^25.1.0",
-        "@types/react": "^18.3.18",
-        "@types/react-dom": "^18.3.5",
-        "@vitejs/plugin-react": "^4.3.4",
-        "autoprefixer": "^10.4.20",
-        "jsdom": "^27.4.0",
-        "postcss": "^8.5.1",
-        "prettier": "^3.4.2",
-        "tailwindcss": "^3.4.17",
-        "typescript": "~5.7.3",
-        "vite": "^6.0.7",
-        "vitest": "^4.0.18"
-    }
+  "name": "pi-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "test": "vitest",
+    "lint": "prettier --check \"**/*.{ts,tsx}\" && tsc --noEmit",
+    "format": "prettier --write \"**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-shell": "^2.2.0",
+    "lucide-react": "^0.563.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.2.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^25.1.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.0.18",
+    "autoprefixer": "^10.4.20",
+    "jsdom": "^27.4.0",
+    "postcss": "^8.5.1",
+    "prettier": "^3.4.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.7.3",
+    "vite": "^6.0.7",
+    "vitest": "^4.0.18"
+  }
 }

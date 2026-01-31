@@ -19,5 +19,5 @@ repos:
         name: prettier
         entry: npm run format
         language: system
-        types_or: [javascript, jsx, ts, tsx, css, html]
+        types_or: [ts, tsx]
         pass_filenames: false

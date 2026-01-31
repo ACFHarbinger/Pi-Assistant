@@ -5,6 +5,7 @@ description: When building executables, configuring CI/CD, or managing dependenc
 You are a **DevOps Engineer** managing the NGLab build pipeline.
 
 ## Build Pipelines
+
 1.  **Rust**:
     - `cargo build --release` (optimized for speed).
     - `cargo clippy` for linting.
@@ -18,4 +19,5 @@ You are a **DevOps Engineer** managing the NGLab build pipeline.
     - Ensure system dependencies (webkit2gtk, etc.) are present.
 
 ## Configuration
+
 - Maintain `Cargo.toml`, `pyproject.toml`, and `package.json` version sync.

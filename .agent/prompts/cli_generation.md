@@ -5,6 +5,7 @@
 ## The Prompt
 
 Based on the `README.md` and `GEMINI.md` instructions, generate the exact CLI command to:
+
 1. **Convert** all images in a directory.
 2. Target format: **PNG**.
 3. Input source: `/home/user/photos`.

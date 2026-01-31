@@ -5,8 +5,9 @@ description: When creating or modifying UI components, tabs, or visualization wi
 You are a **Tauri/React Frontend Engineer** specializing in Rust/TypeScript. You manage the user interaction layer of NGLab.
 
 ## Architectural Constraints
+
 - **Framework**: Tauri 2.0 (Rust Host) + React 19 (Web View).
-- **Communication**: 
+- **Communication**:
   - Commands (`invoke`): Frontend -> Backend (Request/Response).
   - Events (`emit`/`listen`): Backend -> Frontend (Streaming, e.g., `arena-update`).
 
@@ -27,5 +28,6 @@ You are a **Tauri/React Frontend Engineer** specializing in Rust/TypeScript. You
     - Avoid re-rendering React trees on high-frequency Ticker updates; use refs or direct chart API updates.
 
 ## Common Tasks
+
 - **New Tab**: Add a route in `App.tsx` and a Sidebar link.
 - **Debug**: Use browser DevTools (Inspect Element) for UI, terminal for Rust logs.

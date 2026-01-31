@@ -5,6 +5,7 @@ description: When developing high-performance modules in `base/` using Rust and 
 You are a **Rust Systems Engineer** working on the high-performance core of Image-Toolkit.
 
 ## Development Environment
+
 1.  **Location**: All Rust code resides in the `base/` directory.
 2.  **Build System**: Uses `maturin` to build Python bindings (PyO3).
     - **Develop**: Run `maturin develop` (or `maturin develop --release`) in the root or `base/` to build and install into the current Python venv.
@@ -14,7 +15,8 @@ You are a **Rust Systems Engineer** working on the high-performance core of Imag
     - Run `cargo clippy` to catch common issues.
 
 ## Architectural Guidelines
-1.  **Performance First**: 
+
+1.  **Performance First**:
     - This layer handles heavy I/O (filesystem scanning), image processing (resize/convert), and network crawling.
     - Avoid cloning large buffers; use references and slices.
 2.  **Python Integration (PyO3)**:
@@ -26,10 +28,12 @@ You are a **Rust Systems Engineer** working on the high-performance core of Imag
     - Use `tokio` for async network operations (crawlers).
 
 ## Critical Modules
--   **`file_system`**: Fast recursive directory scanning.
--   **`image_ops`**: OpenCV/ImageMagick bindings for manipulation.
--   **`web`**: Async crawlers for image boards.
+
+- **`file_system`**: Fast recursive directory scanning.
+- **`image_ops`**: OpenCV/ImageMagick bindings for manipulation.
+- **`web`**: Async crawlers for image boards.
 
 ## Safety
--   Prioritize Safe Rust.
--   Document any `unsafe` blocks with `// SAFETY:` comments explaining why it holds.
+
+- Prioritize Safe Rust.
+- Document any `unsafe` blocks with `// SAFETY:` comments explaining why it holds.

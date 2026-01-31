@@ -41,6 +41,7 @@ If you see linker errors about `sqlite3`, you may have a conflicting system SQLi
 **Symptom:** Dependency resolution errors or extremely slow installs.
 
 **Solution:**
+
 ```bash
 # Clear the cache and retry
 rm -rf node_modules package-lock.json
@@ -63,6 +64,7 @@ To speed up development builds:
 
 1. Use `cargo install sccache` and set `RUSTC_WRAPPER=sccache`.
 2. In `src-tauri/Cargo.toml`, add a dev profile:
+
    ```toml
    [profile.dev]
    opt-level = 0
@@ -71,6 +73,7 @@ To speed up development builds:
    [profile.dev.package."*"]
    opt-level = 2  # optimize dependencies but not your code
    ```
+
 3. Use `mold` (Linux) or `lld` as the linker for faster linking:
    ```toml
    # .cargo/config.toml
@@ -89,11 +92,13 @@ To speed up development builds:
 **Causes and solutions:**
 
 1. **Python not found:** Ensure `python3` is on your PATH, or set `PI_ASSISTANT_PYTHON`:
+
    ```bash
    export PI_ASSISTANT_PYTHON=/path/to/python3
    ```
 
 2. **Missing Python dependencies:** Ensure the sidecar's virtual environment is set up:
+
    ```bash
    cd sidecar
    uv sync   # or: pip install -e .
@@ -116,6 +121,7 @@ To speed up development builds:
 1. **Out of memory (OOM):** Loading large ML models can exceed available RAM. Check `dmesg` or system logs. Reduce model size or add swap space.
 
 2. **CUDA error:** If using GPU, ensure CUDA and PyTorch CUDA versions match:
+
    ```bash
    python -c "import torch; print(torch.cuda.is_available())"
    ```
@@ -135,6 +141,7 @@ The Rust core will attempt to detect the crash and can restart the sidecar autom
 1. **Same network:** Both devices must be on the same local network (WiFi).
 
 2. **Correct IP:** The server IP shown in the Android settings must match the desktop machine's LAN IP:
+
    ```bash
    # Linux
    ip addr show | grep "inet " | grep -v 127.0.0.1
@@ -144,6 +151,7 @@ The Rust core will attempt to detect the crash and can restart the sidecar autom
    ```
 
 3. **Firewall:** Ensure port 9120 is open:
+
    ```bash
    # Linux (ufw)
    sudo ufw allow 9120/tcp
@@ -154,6 +162,7 @@ The Rust core will attempt to detect the crash and can restart the sidecar autom
    ```
 
 4. **Server running:** The WebSocket server only starts when the desktop app is running. Verify with:
+
    ```bash
    curl -s http://localhost:9120/ws
    # Should return an HTTP 426 (Upgrade Required) — this means the server is running
@@ -194,6 +203,7 @@ The Rust core will attempt to detect the crash and can restart the sidecar autom
 **Causes:**
 
 1. **No embeddings stored:** Check if the `memory_vectors` table has entries:
+
    ```bash
    sqlite3 ~/.pi-assistant/data/pi-assistant.db "SELECT COUNT(*) FROM memory_vectors;"
    ```
@@ -208,14 +218,14 @@ The Rust core will attempt to detect the crash and can restart the sidecar autom
 
 ### Where is data stored?
 
-| Data | Default Location |
-|------|-----------------|
-| SQLite database | `~/.pi-assistant/data/pi-assistant.db` |
-| ML models | `~/.pi-assistant/models/` |
-| Rust build artifacts | `src-tauri/target/` |
-| Node modules | `node_modules/` |
-| Python venv | `sidecar/.venv/` |
-| Android build | `android/app/build/` |
+| Data                 | Default Location                       |
+| -------------------- | -------------------------------------- |
+| SQLite database      | `~/.pi-assistant/data/pi-assistant.db` |
+| ML models            | `~/.pi-assistant/models/`              |
+| Rust build artifacts | `src-tauri/target/`                    |
+| Node modules         | `node_modules/`                        |
+| Python venv          | `sidecar/.venv/`                       |
+| Android build        | `android/app/build/`                   |
 
 ### How to reset all data
 
@@ -250,6 +260,7 @@ The Rust core will restart it automatically.
 ### Large memory usage
 
 **Causes:**
+
 - ML models loaded into RAM. `all-MiniLM-L6-v2` uses ~300 MB. A full GPT-2 model uses ~500 MB. Larger models require proportionally more.
 - Headless Chrome instance (if browser tool is active) uses ~200-500 MB.
 - SQLite with many vector embeddings can grow. Check database size:

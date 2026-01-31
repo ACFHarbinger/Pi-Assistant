@@ -119,10 +119,10 @@ impl SkillManager {
 fn parse_frontmatter(content: &str) -> Result<(SkillFrontmatter, String)> {
     let content = content.trim();
 
-    if content.starts_with("---") {
-        if let Some(end) = content[3..].find("---") {
-            let yaml = &content[3..3 + end].trim();
-            let body = content[3 + end + 3..].trim().to_string();
+    if let Some(content) = content.strip_prefix("---") {
+        if let Some(end) = content.find("---") {
+            let yaml = content[..end].trim();
+            let body = content[end + 3..].trim().to_string();
 
             let frontmatter: SkillFrontmatter =
                 serde_yaml::from_str(yaml).unwrap_or(SkillFrontmatter {

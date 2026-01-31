@@ -16,16 +16,15 @@
 
 [![Tauri](https://img.shields.io/badge/tauri-%2324C8DB.svg?style=for-the-badge&logo=tauri&logoColor=%23262626)](https://tauri.app/)
 [![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)](https://react.dev/)
-[![PyTorch Lightning](https://img.shields.io/badge/pytorch_lightning-792ee5.svg?style=for-the-badge&logo=pytorchlightning&logoColor=white)](https://lightning.ai/docs/pytorch/stable/)
 [![Axum](https://img.shields.io/badge/Axum-%23000000.svg?style=for-the-badge&logo=Axum&logoColor=white)](https://github.com/tokio-rs/axum)
 [![Tokio](https://img.shields.io/badge/Tokio-%23000000.svg?style=for-the-badge&logo=Tokio&logoColor=white)](https://tokio.rs/)
 
 **AI & ML**
 
 [![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)](https://pytorch.org/)
+[![PyTorch Lightning](https://img.shields.io/badge/pytorch_lightning-792ee5.svg?style=for-the-badge&logo=pytorchlightning&logoColor=white)](https://lightning.ai/docs/pytorch/stable/)
 [![HuggingFace](https://img.shields.io/badge/huggingface-%23FFD21E.svg?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/)
 [![sentence-transformers](https://img.shields.io/badge/sentence_transformers-UKPLab-orange?style=for-the-badge)](https://www.sbert.net/)
-[![sqlite-vec](https://img.shields.io/badge/sqlite_vec-000000?style=for-the-badge&logo=sqlite&logoColor=white)](https://github.com/asg017/sqlite-vec)
 
 **Frontend**
 
@@ -36,6 +35,7 @@
 **Database**
 
 [![SQLite](https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![sqlite-vec](https://img.shields.io/badge/sqlite_vec-000000?style=for-the-badge&logo=sqlite&logoColor=white)](https://github.com/asg017/sqlite-vec)
 
 **Tools**
 
@@ -49,11 +49,14 @@
 [![CUDA RTX 4080](https://img.shields.io/badge/CUDA-RTX_4080-76B900?style=for-the-badge&logo=nvidia&logoColor=white)](https://developer.nvidia.com/cuda-toolkit)
 [![CUDA RTX 3090ti](https://img.shields.io/badge/CUDA-RTX_3090ti-76B900?style=for-the-badge&logo=nvidia&logoColor=white)](https://developer.nvidia.com/cuda-toolkit)
 [![Intel](https://img.shields.io/badge/Intel-0071C5?style=for-the-badge&logo=intel&logoColor=white)](https://www.intel.com/)
+[![AMD](https://img.shields.io/badge/AMD-EF3B2C?style=for-the-badge&logo=amd&logoColor=white)](https://www.amd.com/)
+[![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](https://developer.apple.com/apple-silicon/)
 
 **Operating System**
 
 [![Kubuntu](https://img.shields.io/badge/Kubuntu-0079C1?style=for-the-badge&logo=kubuntu&logoColor=white)](https://kubuntu.org/)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)](https://ubuntu.com/)
+[![Windows](https://img.shields.io/badge/Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 
 **Quality & Standards**
 

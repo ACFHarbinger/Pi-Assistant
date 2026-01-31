@@ -96,6 +96,12 @@ pub struct ChannelManager {
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
+impl Default for ChannelManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChannelManager {
     /// Create a new channel manager.
     pub fn new() -> Self {

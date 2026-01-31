@@ -16,6 +16,7 @@ pub struct AuthCallback {
     pub code: String,
 }
 
+#[allow(deprecated)]
 #[tauri::command]
 pub async fn start_oauth(
     app_handle: tauri::AppHandle,
@@ -247,7 +248,7 @@ pub async fn exchange_oauth_code(
                 .arg("-4")
                 .arg("-X")
                 .arg("POST")
-                .arg(&token_url)
+                .arg(token_url)
                 .arg("-d")
                 .arg(format!("code={}", code))
                 .arg("-d")
@@ -347,6 +348,7 @@ fn generate_pkce() -> (String, String) {
     (verifier, challenge)
 }
 
+#[allow(deprecated)]
 #[tauri::command]
 pub async fn start_claude_oauth(app_handle: tauri::AppHandle) -> Result<(), String> {
     let (verifier, challenge) = generate_pkce();

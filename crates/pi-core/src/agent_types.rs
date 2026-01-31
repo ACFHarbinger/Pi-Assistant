@@ -5,9 +5,10 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Agent state machine.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(tag = "status", content = "data")]
 pub enum AgentState {
+    #[default]
     Idle,
     Running {
         task_id: Uuid,
@@ -25,12 +26,6 @@ pub enum AgentState {
     AssistantMessage {
         content: String,
     },
-}
-
-impl Default for AgentState {
-    fn default() -> Self {
-        Self::Idle
-    }
 }
 
 /// Reason the agent stopped.

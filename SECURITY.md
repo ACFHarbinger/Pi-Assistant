@@ -21,11 +21,11 @@ Instead, report via one of these channels:
 
 ### Response Timeline
 
-| Action | Target |
-|--------|--------|
-| Acknowledgment | Within 48 hours |
-| Initial assessment | Within 1 week |
-| Fix or mitigation | Within 30 days for critical issues |
+| Action             | Target                             |
+| ------------------ | ---------------------------------- |
+| Acknowledgment     | Within 48 hours                    |
+| Initial assessment | Within 1 week                      |
+| Fix or mitigation  | Within 30 days for critical issues |
 
 ---
 
@@ -46,6 +46,7 @@ See [docs/SAFETY-MODEL.md](docs/SAFETY-MODEL.md) for full details.
 ### 2. Path Restrictions
 
 File access is restricted:
+
 - System directories (`/etc`, `/sys`, `/proc`, etc.) are blocked.
 - Sensitive user directories (`~/.ssh`, `~/.gnupg`, `~/.aws`) are blocked.
 - Path traversal (`..`) is rejected.
@@ -73,20 +74,20 @@ The WebSocket server for mobile clients binds to the local network. It uses toke
 
 ## Known Limitations
 
-| Limitation | Description | Mitigation |
-|------------|-------------|------------|
-| **Regex-based command filtering** | Sophisticated command obfuscation (e.g., base64-encoded payloads) could bypass pattern matching. | Default-deny policy means unrecognized commands require user approval. |
-| **No filesystem sandboxing (yet)** | Shell commands run with the user's full permissions. | Permission engine blocks known dangerous commands. User approval required for mutations. |
+| Limitation                             | Description                                                                                                        | Mitigation                                                                                           |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| **Regex-based command filtering**      | Sophisticated command obfuscation (e.g., base64-encoded payloads) could bypass pattern matching.                   | Default-deny policy means unrecognized commands require user approval.                               |
+| **No filesystem sandboxing (yet)**     | Shell commands run with the user's full permissions.                                                               | Permission engine blocks known dangerous commands. User approval required for mutations.             |
 | **Python sidecar shares user context** | The sidecar runs as the same user. A compromised model could theoretically be prompted to exploit the IPC channel. | The Rust core validates all IPC responses. Tool execution always goes through the permission engine. |
-| **Local network WebSocket** | Anyone on the same LAN who obtains the pairing code can connect. | Token-based auth with pairing flow. Consider adding mTLS for high-security environments. |
+| **Local network WebSocket**            | Anyone on the same LAN who obtains the pairing code can connect.                                                   | Token-based auth with pairing flow. Consider adding mTLS for high-security environments.             |
 
 ---
 
 ## Supported Versions
 
-| Version | Supported |
-|---------|-----------|
-| 0.1.x (upcoming) | Yes |
+| Version          | Supported |
+| ---------------- | --------- |
+| 0.1.x (upcoming) | Yes       |
 
 Security updates will be applied to the latest release and the `main` branch.
 

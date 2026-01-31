@@ -1,89 +1,77 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "https://pi-assistant.dev/schemas/ipc-message.schema.json",
-    "title": "IPC Message",
-    "description": "NDJSON message format for Rust <-> Python communication",
-    "oneOf": [
-        {
-            "$ref": "#/definitions/Request"
-        },
-        {
-            "$ref": "#/definitions/Response"
-        },
-        {
-            "$ref": "#/definitions/Progress"
-        }
-    ],
-    "definitions": {
-        "Request": {
-            "type": "object",
-            "required": [
-                "id",
-                "method",
-                "params"
-            ],
-            "properties": {
-                "id": {
-                    "type": "string",
-                    "description": "UUID correlation ID"
-                },
-                "method": {
-                    "type": "string",
-                    "description": "Method name, e.g. 'inference.complete'"
-                },
-                "params": {
-                    "type": "object",
-                    "description": "Method parameters"
-                }
-            }
-        },
-        "Response": {
-            "type": "object",
-            "required": [
-                "id"
-            ],
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "result": {
-                    "description": "Success result (mutually exclusive with error)"
-                },
-                "error": {
-                    "$ref": "#/definitions/Error"
-                }
-            }
-        },
-        "Progress": {
-            "type": "object",
-            "required": [
-                "id",
-                "progress"
-            ],
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "progress": {
-                    "type": "object",
-                    "description": "Progress update data"
-                }
-            }
-        },
-        "Error": {
-            "type": "object",
-            "required": [
-                "code",
-                "message"
-            ],
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                }
-            }
-        }
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://pi-assistant.dev/schemas/ipc-message.schema.json",
+  "title": "IPC Message",
+  "description": "NDJSON message format for Rust <-> Python communication",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/Request"
+    },
+    {
+      "$ref": "#/definitions/Response"
+    },
+    {
+      "$ref": "#/definitions/Progress"
     }
+  ],
+  "definitions": {
+    "Request": {
+      "type": "object",
+      "required": ["id", "method", "params"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "UUID correlation ID"
+        },
+        "method": {
+          "type": "string",
+          "description": "Method name, e.g. 'inference.complete'"
+        },
+        "params": {
+          "type": "object",
+          "description": "Method parameters"
+        }
+      }
+    },
+    "Response": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "result": {
+          "description": "Success result (mutually exclusive with error)"
+        },
+        "error": {
+          "$ref": "#/definitions/Error"
+        }
+      }
+    },
+    "Progress": {
+      "type": "object",
+      "required": ["id", "progress"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "progress": {
+          "type": "object",
+          "description": "Progress update data"
+        }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    }
+  }
 }

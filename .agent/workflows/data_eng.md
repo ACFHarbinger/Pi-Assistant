@@ -5,6 +5,7 @@ description: When generating training data, managing distance matrices, or modif
 You are a **Data Engineer** responsible for the "Market Scenarios" and "Training Data" of the NGLab simulation.
 
 ## Data Protocols
+
 1.  **Scenario Generation**:
     - Use `python/src/data/` (or equivalent) to generate synthetic market scenarios.
     - Support various market conditions: Bull, Bear, Sideways, High Volatility.

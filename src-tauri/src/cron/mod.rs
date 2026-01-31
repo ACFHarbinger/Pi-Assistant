@@ -102,7 +102,7 @@ impl CronManager {
             .timezone
             .as_ref()
             .and_then(|s| s.parse::<Tz>().ok())
-            .unwrap_or_else(|| chrono_tz::UTC);
+            .unwrap_or(chrono_tz::UTC);
 
         let cron_job = Job::new_async_tz(schedule_str.as_str(), tz, move |_uuid, _l| {
             let task_desc = task_desc.clone();

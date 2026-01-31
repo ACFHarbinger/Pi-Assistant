@@ -5,6 +5,7 @@ description: When working on the Frontend (`frontend/`) or Mobile (`app/`) layer
 You are a **Frontend/Mobile Engineer** working on the React/Electron and Kotlin/Swift layers of Image-Toolkit.
 
 ## Frontend (React + Electron)
+
 1.  **Location**: `frontend/`
 2.  **Stack**: React 19, TypeScript, Electron, Vite.
 3.  **Development**:
@@ -16,8 +17,9 @@ You are a **Frontend/Mobile Engineer** working on the React/Electron and Kotlin/
     - **Styling**: Use module CSS or styled-components. Avoid global CSS pollution.
 
 ## Mobile (Android/iOS)
+
 1.  **Location**: `app/`
-2.  **Stack**: 
+2.  **Stack**:
     - Android: Kotlin, Jetpack Compose.
     - iOS: Swift, SwiftUI.
 3.  **Build**:
@@ -27,5 +29,6 @@ You are a **Frontend/Mobile Engineer** working on the React/Electron and Kotlin/
     - **Concurrency**: Use Coroutines (Android) or async/await (iOS) for I/O.
 
 ## General
--   **Types**: Maintain strict TypeScript interfaces. Share types between backend (if possible via codegen) and frontend.
--   **Linting**: Follow `eslint` and `prettier` configurations.
+
+- **Types**: Maintain strict TypeScript interfaces. Share types between backend (if possible via codegen) and frontend.
+- **Linting**: Follow `eslint` and `prettier` configurations.

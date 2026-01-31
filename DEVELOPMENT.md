@@ -8,20 +8,20 @@ How to set up your development environment, build each component, and run Pi-Ass
 
 ### Required
 
-| Tool | Version | Install |
-|------|---------|---------|
-| **Rust** | 1.75+ | [rustup.rs](https://rustup.rs/) |
-| **Node.js** | 20+ | [nodejs.org](https://nodejs.org/) or `nvm` |
-| **Python** | 3.11+ | [python.org](https://www.python.org/) or system package manager |
-| **System libs** | — | See platform-specific section below |
+| Tool            | Version | Install                                                         |
+| --------------- | ------- | --------------------------------------------------------------- |
+| **Rust**        | 1.75+   | [rustup.rs](https://rustup.rs/)                                 |
+| **Node.js**     | 20+     | [nodejs.org](https://nodejs.org/) or `nvm`                      |
+| **Python**      | 3.11+   | [python.org](https://www.python.org/) or system package manager |
+| **System libs** | —       | See platform-specific section below                             |
 
 ### Recommended
 
-| Tool | Purpose | Install |
-|------|---------|---------|
-| `uv` | Fast Python package manager | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| `just` | Command runner (like `make`) | `cargo install just` |
-| Android Studio | Mobile client development | [developer.android.com](https://developer.android.com/studio) |
+| Tool           | Purpose                      | Install                                                       |
+| -------------- | ---------------------------- | ------------------------------------------------------------- |
+| `uv`           | Fast Python package manager  | `curl -LsSf https://astral.sh/uv/install.sh \| sh`            |
+| `just`         | Command runner (like `make`) | `cargo install just`                                          |
+| Android Studio | Mobile client development    | [developer.android.com](https://developer.android.com/studio) |
 
 ### Platform-Specific System Libraries
 
@@ -145,6 +145,7 @@ npm run tauri dev
 ```
 
 This command:
+
 1. Starts the Vite dev server for the React frontend (hot reload enabled).
 2. Compiles and runs the Rust Tauri backend.
 3. The Rust backend spawns the Python sidecar automatically.
@@ -198,6 +199,7 @@ npm run tauri build
 ```
 
 This produces platform-specific installers:
+
 - **Linux**: `.deb`, `.AppImage` in `src-tauri/target/release/bundle/`
 - **macOS**: `.dmg`, `.app` in `src-tauri/target/release/bundle/`
 - **Windows**: `.msi`, `.exe` in `src-tauri/target/release/bundle/`
@@ -282,14 +284,14 @@ Pi-Assistant/
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PI_ASSISTANT_DATA_DIR` | `~/.pi-assistant/data` | SQLite database and data storage |
-| `PI_ASSISTANT_MODELS_DIR` | `~/.pi-assistant/models` | ML model storage |
-| `PI_ASSISTANT_WS_PORT` | `9120` | WebSocket server port |
-| `PI_ASSISTANT_LOG_LEVEL` | `info` | Rust tracing log level (`trace`, `debug`, `info`, `warn`, `error`) |
-| `PI_ASSISTANT_PYTHON` | `python3` | Path to Python interpreter for sidecar |
-| `PI_ASSISTANT_CHROME` | (auto-detected) | Path to Chrome/Chromium binary |
+| Variable                  | Default                  | Description                                                        |
+| ------------------------- | ------------------------ | ------------------------------------------------------------------ |
+| `PI_ASSISTANT_DATA_DIR`   | `~/.pi-assistant/data`   | SQLite database and data storage                                   |
+| `PI_ASSISTANT_MODELS_DIR` | `~/.pi-assistant/models` | ML model storage                                                   |
+| `PI_ASSISTANT_WS_PORT`    | `9120`                   | WebSocket server port                                              |
+| `PI_ASSISTANT_LOG_LEVEL`  | `info`                   | Rust tracing log level (`trace`, `debug`, `info`, `warn`, `error`) |
+| `PI_ASSISTANT_PYTHON`     | `python3`                | Path to Python interpreter for sidecar                             |
+| `PI_ASSISTANT_CHROME`     | (auto-detected)          | Path to Chrome/Chromium binary                                     |
 
 ---
 
@@ -352,6 +354,7 @@ echo '{"id":"1","method":"inference.embed","params":{"text":"hello world"}}' | p
 ### VS Code (Recommended)
 
 Recommended extensions:
+
 - `rust-analyzer` — Rust language server
 - `tauri-vscode` — Tauri integration
 - `ms-python.python` — Python support

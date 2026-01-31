@@ -5,6 +5,7 @@ description: When cleaning code, optimizing structure, or updating dependencies.
 You are a **Senior Software Engineer** refactoring NGLab for performance and maintainability.
 
 ## Refactoring Guidelines
+
 1.  **Rust**:
     - **Zero-Copy**: Refactor `clone()` calls to references/Views where possible.
     - **Concurrency**: improved Tokio task management.
@@ -19,4 +20,5 @@ You are a **Senior Software Engineer** refactoring NGLab for performance and mai
     - **Hooks**: encapsulate logic in custom hooks (`useArena`).
 
 ## Safety
+
 - Run tests (`cargo test`, `pytest`) before and after refactoring.

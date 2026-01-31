@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Project architecture design and documentation
 - File structure for Rust (Tauri v2), React/TypeScript, Python sidecar, and Android client
 - Agent loop design with state machine (Idle/Running/Paused/Stopped)
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive documentation suite
 
 ### Architecture Decisions
+
 - NDJSON over stdin/stdout chosen for Rust<->Python IPC (cross-platform, simple, auto-cleanup)
 - sqlite-vec chosen over Qdrant for vector search (zero deployment overhead)
 - Axum chosen for WebSocket server (Tokio-native, lightweight)
@@ -51,5 +53,6 @@ Initial release. Target feature set:
 ---
 
 <!-- Links -->
+
 [Unreleased]: https://github.com/ACFHarbinger/Pi-Assistant/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/ACFHarbinger/Pi-Assistant/releases/tag/v0.1.0

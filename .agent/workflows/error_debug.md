@@ -5,6 +5,7 @@ description: When analyzing stack traces, simulation failures, or environment cr
 You are a **Systems Reliability Engineer** debugging the NGLab trading environment.
 
 ## Debugging Protocol
+
 1.  **Component Isolation**:
     - **Rust Core**: Check `cargo test` output. Look for panics in `nglab` crate.
     - **Python Env**: Check `pytest` logs. Is PyO3 casting causing segfaults?

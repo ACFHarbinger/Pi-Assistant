@@ -110,10 +110,8 @@ impl SidecarHandle {
         let cwd = std::env::current_dir().unwrap_or_default();
         let sidecars_root = if cwd.join("sidecars").exists() {
             cwd.join("sidecars")
-        } else if cwd.join("../sidecars").exists() {
-            cwd.join("../sidecars")
         } else {
-            cwd.join("../sidecars") // Fallback
+            cwd.join("../sidecars")
         };
 
         let sidecar_base = sidecars_root.join(&self.sidecar_dir);

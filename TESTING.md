@@ -8,12 +8,12 @@ Testing strategy, test organization, and instructions for running tests across a
 
 Pi-Assistant spans four languages and multiple process boundaries. The testing strategy is organized into layers:
 
-| Layer | Scope | Speed | Tools |
-|-------|-------|-------|-------|
-| **Unit** | Single function/struct, mocked dependencies | Fast (ms) | `cargo test`, `pytest`, `vitest`, `JUnit` |
-| **Integration** | Module-to-module within one runtime | Medium (seconds) | Same tools, but with real dependencies |
-| **IPC** | Rust <-> Python round-trip communication | Medium | Custom test harness |
-| **End-to-End** | Full app: UI -> Rust -> Python -> Storage | Slow (minutes) | Tauri test driver, Playwright |
+| Layer           | Scope                                       | Speed            | Tools                                     |
+| --------------- | ------------------------------------------- | ---------------- | ----------------------------------------- |
+| **Unit**        | Single function/struct, mocked dependencies | Fast (ms)        | `cargo test`, `pytest`, `vitest`, `JUnit` |
+| **Integration** | Module-to-module within one runtime         | Medium (seconds) | Same tools, but with real dependencies    |
+| **IPC**         | Rust <-> Python round-trip communication    | Medium           | Custom test harness                       |
+| **End-to-End**  | Full app: UI -> Rust -> Python -> Storage   | Slow (minutes)   | Tauri test driver, Playwright             |
 
 The focus is on thorough **unit and integration tests** for each runtime, plus targeted **IPC tests** for the cross-language boundary.
 
@@ -64,16 +64,16 @@ src-tauri/src/
 
 ### What to Test
 
-| Module | Key Test Cases |
-|--------|---------------|
-| `agent/loop.rs` | Cancellation token stops loop; iteration limit enforced; pause/resume cycle works; stop during pause exits cleanly |
-| `tools/shell.rs` | Command output capture; timeout enforcement; exit code handling |
-| `tools/code.rs` | Path validation blocks `..`; blocked directories rejected; canonicalization works |
-| `ipc/ndjson.rs` | Valid JSON round-trips; malformed lines are skipped; newline delimiters |
-| `ipc/router.rs` | Responses routed to correct caller by ID; timeout removes pending entry; progress messages don't complete requests |
-| `memory/sqlite.rs` | Schema creation idempotent; insert + query; foreign key constraints |
-| `memory/vector.rs` | Insert vector + search by similarity; empty table returns empty; dimension mismatch errors |
-| `safety/permission.rs` | Block rules override auto-approve; user overrides take precedence; default is ask-user; path traversal blocked |
+| Module                 | Key Test Cases                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `agent/loop.rs`        | Cancellation token stops loop; iteration limit enforced; pause/resume cycle works; stop during pause exits cleanly |
+| `tools/shell.rs`       | Command output capture; timeout enforcement; exit code handling                                                    |
+| `tools/code.rs`        | Path validation blocks `..`; blocked directories rejected; canonicalization works                                  |
+| `ipc/ndjson.rs`        | Valid JSON round-trips; malformed lines are skipped; newline delimiters                                            |
+| `ipc/router.rs`        | Responses routed to correct caller by ID; timeout removes pending entry; progress messages don't complete requests |
+| `memory/sqlite.rs`     | Schema creation idempotent; insert + query; foreign key constraints                                                |
+| `memory/vector.rs`     | Insert vector + search by similarity; empty table returns empty; dimension mismatch errors                         |
+| `safety/permission.rs` | Block rules override auto-approve; user overrides take precedence; default is ask-user; path traversal blocked     |
 
 ### Mocking the Python Sidecar
 
@@ -131,15 +131,15 @@ sidecar/tests/
 
 ### What to Test
 
-| Module | Key Test Cases |
-|--------|---------------|
-| `ipc/ndjson_transport.py` | JSON round-trip; malformed input skipped; concurrent writes don't interleave; progress messages have correct format |
-| `ipc/handler.py` | Known methods dispatch correctly; unknown method raises error; health ping returns version |
-| `inference/engine.py` | Embedding returns correct dimensions (384); completion returns non-empty text; model loading is lazy |
-| `inference/embeddings.py` | Same text produces same embedding; different text produces different embeddings; empty string handled |
-| `training/lightning_module.py` | Forward pass produces loss; training step logs metrics; optimizer configured correctly |
-| `training/trainer.py` | Progress callback called per epoch; stop training cancels cleanly |
-| `models/registry.py` | List models on empty dir returns empty; load non-existent model raises error |
+| Module                         | Key Test Cases                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `ipc/ndjson_transport.py`      | JSON round-trip; malformed input skipped; concurrent writes don't interleave; progress messages have correct format |
+| `ipc/handler.py`               | Known methods dispatch correctly; unknown method raises error; health ping returns version                          |
+| `inference/engine.py`          | Embedding returns correct dimensions (384); completion returns non-empty text; model loading is lazy                |
+| `inference/embeddings.py`      | Same text produces same embedding; different text produces different embeddings; empty string handled               |
+| `training/lightning_module.py` | Forward pass produces loss; training step logs metrics; optimizer configured correctly                              |
+| `training/trainer.py`          | Progress callback called per epoch; stop training cancels cleanly                                                   |
+| `models/registry.py`           | List models on empty dir returns empty; load non-existent model raises error                                        |
 
 ### Async Tests
 
@@ -221,12 +221,12 @@ src/
 
 ### What to Test
 
-| Module | Key Test Cases |
-|--------|---------------|
-| `stores/agentStore.ts` | State transitions correct; addMessage appends; setTask updates |
-| `hooks/useAgentState.ts` | Subscribes to Tauri events; unsubscribes on unmount |
+| Module                            | Key Test Cases                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `stores/agentStore.ts`            | State transitions correct; addMessage appends; setTask updates                               |
+| `hooks/useAgentState.ts`          | Subscribes to Tauri events; unsubscribes on unmount                                          |
 | `components/PermissionDialog.tsx` | Renders command text; approve calls handler; deny calls handler; "remember" checkbox toggles |
-| `services/tauriIpc.ts` | Functions call `invoke` with correct command names and arguments |
+| `services/tauriIpc.ts`            | Functions call `invoke` with correct command names and arguments                             |
 
 ### Mocking Tauri
 
@@ -274,12 +274,12 @@ android/app/src/
 
 ### What to Test
 
-| Module | Key Test Cases |
-|--------|---------------|
-| `WebSocketClient` | Message parsing; connection state transitions; send returns false when disconnected |
-| `ConnectionManager` | Exponential backoff timing; reconnect on error; disconnect cancels reconnect |
-| `AgentViewModel` | State flow emits correct agent state; chat messages accumulate; permission requests forwarded |
-| `SpeechRecognizerHelper` | Callbacks invoked on result; error callback on failure |
+| Module                   | Key Test Cases                                                                                |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| `WebSocketClient`        | Message parsing; connection state transitions; send returns false when disconnected           |
+| `ConnectionManager`      | Exponential backoff timing; reconnect on error; disconnect cancels reconnect                  |
+| `AgentViewModel`         | State flow emits correct agent state; chat messages accumulate; permission requests forwarded |
+| `SpeechRecognizerHelper` | Callbacks invoked on result; error callback on failure                                        |
 
 ### Testing Flows with Turbine
 
@@ -439,11 +439,11 @@ npm run test -- --coverage
 
 ### Coverage Targets
 
-| Runtime | Target | Critical Modules |
-|---------|--------|-----------------|
-| Rust | 70%+ | `safety/permission.rs` (90%+), `ipc/ndjson.rs` (90%+), `memory/` (80%+) |
-| Python | 70%+ | `ipc/` (90%+), `inference/` (80%+) |
-| TypeScript | 60%+ | `stores/`, `services/` |
-| Kotlin | 60%+ | `network/`, `viewmodel/` |
+| Runtime    | Target | Critical Modules                                                        |
+| ---------- | ------ | ----------------------------------------------------------------------- |
+| Rust       | 70%+   | `safety/permission.rs` (90%+), `ipc/ndjson.rs` (90%+), `memory/` (80%+) |
+| Python     | 70%+   | `ipc/` (90%+), `inference/` (80%+)                                      |
+| TypeScript | 60%+   | `stores/`, `services/`                                                  |
+| Kotlin     | 60%+   | `network/`, `viewmodel/`                                                |
 
 The safety and IPC modules are the most critical — bugs there can cause security issues or silent data corruption.

@@ -6,6 +6,7 @@ description: When working on the deep learning models or reinforcement learning 
 You are an expert in Python, AI, and Machine Learning development.
 
 Key Principles:
+
 - Write clean, efficient, and well-documented code
 - Follow PEP 8 style guidelines
 - Use type hints for better code clarity
@@ -13,6 +14,7 @@ Key Principles:
 - Write modular and reusable code
 
 Python Best Practices:
+
 - Use virtual environments (venv, conda)
 - Use requirements.txt or pyproject.toml for dependencies
 - Follow naming conventions (snake_case for functions/variables)
@@ -21,6 +23,7 @@ Python Best Practices:
 - Implement proper logging
 
 Machine Learning:
+
 - Use scikit-learn for traditional ML
 - Use PyTorch or TensorFlow for deep learning
 - Implement proper data preprocessing
@@ -29,6 +32,7 @@ Machine Learning:
 - Version control datasets and models
 
 Data Processing:
+
 - Use pandas for data manipulation
 - Use numpy for numerical computations
 - Use matplotlib/seaborn for visualization
@@ -37,6 +41,7 @@ Data Processing:
 - Use efficient data structures
 
 Deep Learning:
+
 - Use PyTorch or TensorFlow/Keras
 - Implement proper model architecture
 - Use data augmentation
@@ -45,6 +50,7 @@ Deep Learning:
 - Monitor training with TensorBoard
 
 Model Deployment:
+
 - Use FastAPI or Flask for serving models
 - Implement model versioning
 - Use Docker for containerization
@@ -53,6 +59,7 @@ Model Deployment:
 - Monitor model performance in production
 
 Testing:
+
 - Write unit tests with pytest
 - Test data pipelines
 - Test model predictions
@@ -60,6 +67,7 @@ Testing:
 - Implement integration tests
 
 Performance:
+
 - Use vectorization with numpy
 - Use multiprocessing for CPU-bound tasks
 - Use async/await for I/O-bound tasks

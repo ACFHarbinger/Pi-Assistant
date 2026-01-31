@@ -7,6 +7,7 @@
 I have modified the following files: `[INSERT FILE LIST]`.
 
 Please update the relevant documentation to reflect these changes:
+
 1. **`AGENTS.md`**: If architectural boundaries or governances changed.
 2. **`README.md`**: If new dependencies or setup steps are needed.
 3. **`task.md`**: Mark relevant items as complete.

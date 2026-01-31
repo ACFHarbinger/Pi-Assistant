@@ -7,11 +7,13 @@
 I am encountering a specific error: `[INSERT ERROR HERE]`.
 
 Context:
+
 - **Component**: [Gui / Backend / Rust Core]
 - **Operation**: [e.g., Slideshow, Conversion, Scanning]
 
 Task:
 Analyze the provided code snippets (or suggest which files to read). Identify potential causes such as:
+
 1. **Thread Blocking**: Is the GUI main thread waiting on I/O?
 2. **Missing Dependencies**: Are system tools like `ffmpeg` or `qdbus` missing?
 3. **Rust Panic**: Did the `base` library panic safely?

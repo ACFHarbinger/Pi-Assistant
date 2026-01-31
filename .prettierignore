@@ -1,0 +1,25 @@
+# Dependencies
+node_modules
+target
+.venv
+dist
+
+# Agent Brain (Transient)
+.gemini
+
+# Logs
+*.log
+clippy_output.txt
+clippy_output_final.txt
+clippy_output_final.txt
+clippy_output.txt
+
+# Media
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.mp4
+*.wav
+*.mp3

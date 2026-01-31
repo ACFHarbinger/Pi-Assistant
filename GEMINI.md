@@ -28,12 +28,12 @@ The agent runs as an asynchronous Tokio task inside the Rust core. It follows a 
                    └───────────┘
 ```
 
-| State | Description |
-|-------|-------------|
-| **Idle** | No task is running. Waiting for user input. |
-| **Running** | Agent is actively iterating. Broadcasts current iteration number. |
-| **Paused** | Agent is blocked. Either asking the user a question or awaiting permission approval. Contains the question/permission request in its state payload. |
-| **Stopped** | Terminal state. Includes a reason: `Completed`, `ManualStop`, `Error`, or `IterationLimit`. |
+| State       | Description                                                                                                                                         |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Idle**    | No task is running. Waiting for user input.                                                                                                         |
+| **Running** | Agent is actively iterating. Broadcasts current iteration number.                                                                                   |
+| **Paused**  | Agent is blocked. Either asking the user a question or awaiting permission approval. Contains the question/permission request in its state payload. |
+| **Stopped** | Terminal state. Includes a reason: `Completed`, `ManualStop`, `Error`, or `IterationLimit`.                                                         |
 
 ### Iteration Cycle
 
@@ -115,6 +115,7 @@ pub trait Tool: Send + Sync {
 Executes arbitrary shell commands via `tokio::process::Command`.
 
 **Parameters:**
+
 ```json
 {
   "command": "git status",
@@ -124,6 +125,7 @@ Executes arbitrary shell commands via `tokio::process::Command`.
 ```
 
 **Returns:**
+
 ```json
 {
   "stdout": "On branch main\nnothing to commit...",
@@ -141,17 +143,18 @@ Controls a headless Chrome instance via Chrome DevTools Protocol (using the `chr
 
 **Actions:**
 
-| Action | Description |
-|--------|-------------|
-| `navigate` | Go to a URL, wait for page load |
+| Action         | Description                              |
+| -------------- | ---------------------------------------- |
+| `navigate`     | Go to a URL, wait for page load          |
 | `extract_text` | Get the visible text content of the page |
-| `extract_html` | Get the raw HTML |
-| `screenshot` | Take a PNG screenshot |
-| `click` | Click an element by CSS selector |
-| `fill` | Fill a form field by CSS selector |
-| `evaluate` | Execute JavaScript and return the result |
+| `extract_html` | Get the raw HTML                         |
+| `screenshot`   | Take a PNG screenshot                    |
+| `click`        | Click an element by CSS selector         |
+| `fill`         | Fill a form field by CSS selector        |
+| `evaluate`     | Execute JavaScript and return the result |
 
 **Parameters (navigate example):**
+
 ```json
 {
   "action": "navigate",
@@ -168,13 +171,13 @@ Reads, writes, and patches files on disk.
 
 **Actions:**
 
-| Action | Parameters | Description |
-|--------|-----------|-------------|
-| `read` | `path` | Read file contents |
-| `write` | `path`, `content` | Write/overwrite a file |
-| `patch` | `path`, `old`, `new` | Replace a string in a file |
-| `list` | `path`, `pattern` | List directory contents with optional glob |
-| `create_dir` | `path` | Create a directory (mkdir -p) |
+| Action       | Parameters           | Description                                |
+| ------------ | -------------------- | ------------------------------------------ |
+| `read`       | `path`               | Read file contents                         |
+| `write`      | `path`, `content`    | Write/overwrite a file                     |
+| `patch`      | `path`, `old`, `new` | Replace a string in a file                 |
+| `list`       | `path`, `pattern`    | List directory contents with optional glob |
+| `create_dir` | `path`               | Create a directory (mkdir -p)              |
 
 **Safety:** Path-based restrictions. Blocked directories: `/etc`, `/sys`, `/proc`, `/boot`, `~/.ssh`, `~/.gnupg`, `~/.aws`. Path traversal (`..`) is rejected. All paths are canonicalized before checking. Read operations are auto-approved; writes require user confirmation.
 
@@ -184,11 +187,11 @@ Delegates to the Python sidecar for ML tasks. This is a bridge tool — it trans
 
 **Actions:**
 
-| Action | IPC Method | Description |
-|--------|-----------|-------------|
-| `embed` | `inference.embed` | Generate text embeddings (384-dim) |
-| `complete` | `inference.complete` | Text generation via loaded LLM |
-| `plan` | `inference.plan` | Agent planning step (structured output) |
+| Action     | IPC Method           | Description                             |
+| ---------- | -------------------- | --------------------------------------- |
+| `embed`    | `inference.embed`    | Generate text embeddings (384-dim)      |
+| `complete` | `inference.complete` | Text generation via loaded LLM          |
+| `plan`     | `inference.plan`     | Agent planning step (structured output) |
 
 **Safety:** Auto-approved. The Python sidecar runs in the same security context as the Rust process.
 
@@ -219,7 +222,7 @@ The planner returns an `AgentPlan`:
   "tool_calls": [
     {
       "tool_name": "shell",
-      "parameters": {"command": "cat package.json"}
+      "parameters": { "command": "cat package.json" }
     }
   ],
   "question": null,
@@ -229,12 +232,12 @@ The planner returns an `AgentPlan`:
 
 ### Plan Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `reasoning` | `string` | Chain-of-thought explanation (logged, shown in UI) |
-| `tool_calls` | `ToolCall[]` | Ordered list of tools to execute this iteration |
-| `question` | `string?` | If set, the agent pauses and asks the user this question |
-| `is_complete` | `bool` | If true, the task is done and the loop terminates |
+| Field         | Type         | Description                                              |
+| ------------- | ------------ | -------------------------------------------------------- |
+| `reasoning`   | `string`     | Chain-of-thought explanation (logged, shown in UI)       |
+| `tool_calls`  | `ToolCall[]` | Ordered list of tools to execute this iteration          |
+| `question`    | `string?`    | If set, the agent pauses and asks the user this question |
+| `is_complete` | `bool`       | If true, the task is done and the loop terminates        |
 
 ### Planning Strategy
 
@@ -294,13 +297,13 @@ This separation means you can swap LLM providers (local model, OpenAI API, Anthr
 
 Every significant event is persisted:
 
-| Event | Table | Also Embedded? |
-|-------|-------|----------------|
-| User message | `messages` | Yes |
-| Agent response | `messages` | Yes |
-| Tool call + result | `tool_executions` | Result text is embedded |
-| Task creation | `tasks` | Description is embedded |
-| Permission decision | `permission_cache` | No |
+| Event               | Table              | Also Embedded?          |
+| ------------------- | ------------------ | ----------------------- |
+| User message        | `messages`         | Yes                     |
+| Agent response      | `messages`         | Yes                     |
+| Tool call + result  | `tool_executions`  | Result text is embedded |
+| Task creation       | `tasks`            | Description is embedded |
+| Permission decision | `permission_cache` | No                      |
 
 ### Memory Lifecycle
 
@@ -314,14 +317,14 @@ Every significant event is persisted:
 
 Commands flow from the UI or mobile client to the agent loop via a `tokio::sync::mpsc` channel.
 
-| Command | Source | Effect |
-|---------|--------|--------|
-| `Start { task, max_iterations }` | UI / Mobile | Spawns the agent loop |
-| `Stop` | UI / Mobile | Cancels the token, loop exits at next check |
-| `Pause` | UI / Mobile | Loop blocks waiting for `Resume` or `Stop` |
-| `Resume` | UI / Mobile | Unblocks a paused loop |
-| `AnswerQuestion { response }` | UI / Mobile | Provides the user's answer to an agent question |
-| `ApprovePermission { id, approved, remember }` | UI / Mobile | Responds to a permission request |
+| Command                                        | Source      | Effect                                          |
+| ---------------------------------------------- | ----------- | ----------------------------------------------- |
+| `Start { task, max_iterations }`               | UI / Mobile | Spawns the agent loop                           |
+| `Stop`                                         | UI / Mobile | Cancels the token, loop exits at next check     |
+| `Pause`                                        | UI / Mobile | Loop blocks waiting for `Resume` or `Stop`      |
+| `Resume`                                       | UI / Mobile | Unblocks a paused loop                          |
+| `AnswerQuestion { response }`                  | UI / Mobile | Provides the user's answer to an agent question |
+| `ApprovePermission { id, approved, remember }` | UI / Mobile | Responds to a permission request                |
 
 ### Event Flow
 

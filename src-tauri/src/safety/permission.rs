@@ -106,10 +106,8 @@ impl PermissionEngine {
             .unwrap_or("");
 
         // Read operations are generally safe
-        if action == "read" || action == "list" {
-            if !self.rules.is_path_blocked(path) {
-                return Ok(PermissionResult::Allowed);
-            }
+        if (action == "read" || action == "list") && !self.rules.is_path_blocked(path) {
+            return Ok(PermissionResult::Allowed);
         }
 
         // Write operations need approval

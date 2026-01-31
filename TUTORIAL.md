@@ -150,6 +150,7 @@ The safety system protects your computer. Here's what to expect:
 ### Auto-Approved (No Prompt)
 
 These run silently:
+
 ```
 ls, cat, head, tail, grep, find (no -exec)
 git status, git log, git diff, git show
@@ -160,6 +161,7 @@ uname, whoami, date, pwd
 ### Requires Approval (Dialog Appears)
 
 You'll be asked to approve:
+
 ```
 cp, mv, mkdir, touch, file writes
 git commit, git push, git checkout
@@ -171,6 +173,7 @@ python, node, cargo run
 ### Blocked (Silently Denied)
 
 These never execute:
+
 ```
 sudo, su, rm -rf /, dd, mkfs
 chmod 777, chown root
@@ -239,6 +242,7 @@ Everything the agent does is stored:
 - Task descriptions and outcomes
 
 This data is searchable in two ways:
+
 - **Recency**: The last N messages from the current session.
 - **Semantic similarity**: The agent can find relevant context from any past session by meaning.
 

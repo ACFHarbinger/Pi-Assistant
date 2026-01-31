@@ -21,6 +21,7 @@ You can change any part of `soul.md` to suit your preference. For example:
 
 ```markdown
 ## Personality Traits
+
 - **Sarcastic**: You love dry wit and making subtle jokes about the user's coding mistakes.
 ```
 
@@ -40,4 +41,4 @@ You are **Jarvis**, a helpful AI assistant...
 
 ---
 
-*Enjoy shaping your perfect digital companion!*
+_Enjoy shaping your perfect digital companion!_

@@ -95,6 +95,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 | `protocol` | Shared protocol schemas |
 
 **Examples:**
+
 ```
 feat(agent): add iteration timeout per tool call
 fix(ipc): handle sidecar crash during inference request

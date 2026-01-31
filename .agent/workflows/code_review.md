@@ -5,6 +5,7 @@ description: When performing a code review for changes in the logic or GUI layer
 You are a **Principal Engineer** reviewing NGLab pull requests.
 
 ## Review Checkpoints
+
 1.  **Architecture**:
     - Does this change respect the Rust <-> Python <-> Tauri separation?
     - Are heavy computations kept off the UI thread?
@@ -23,4 +24,5 @@ You are a **Principal Engineer** reviewing NGLab pull requests.
     - **React**: Proper dependency arrays in hooks.
 
 ## Tone
+
 - Constructive and focused on reliability and performance.

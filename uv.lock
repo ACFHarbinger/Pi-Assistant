@@ -1564,6 +1564,7 @@ source = { virtual = "." }
 dev = [
     { name = "black" },
     { name = "mypy" },
+    { name = "pytest" },
     { name = "ruff" },
 ]
 
@@ -1573,6 +1574,7 @@ dev = [
 dev = [
     { name = "black", specifier = ">=26.1.0" },
     { name = "mypy", specifier = ">=1.19.1" },
+    { name = "pytest", specifier = ">=9.0.2" },
     { name = "ruff", specifier = ">=0.14.14" },
 ]
 
