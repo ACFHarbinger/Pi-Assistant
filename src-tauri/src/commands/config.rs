@@ -206,6 +206,23 @@ pub async fn toggle_tool(name: String, enabled: bool) -> Result<ToolsConfig, Str
     Ok(config)
 }
 
+#[tauri::command]
+pub async fn list_local_models(
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let mut sidecar = state.ml_sidecar.lock().await;
+    let response = sidecar
+        .request("model.list", serde_json::json!({}))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(response
+        .get("models")
+        .and_then(|m| m.as_array())
+        .cloned()
+        .unwrap_or_default())
+}
+
 // ── Model Commands ───────────────────────────────────────────────────
 
 #[tauri::command]
@@ -301,6 +318,35 @@ pub async fn load_model(
 
     Ok(())
 }
+#[tauri::command]
+pub async fn download_model(
+    state: tauri::State<'_, crate::state::AppState>,
+    model_id: String,
+) -> Result<(), String> {
+    let mut sidecar = state.ml_sidecar.lock().await;
+    sidecar
+        .request(
+            "model.download",
+            serde_json::json!({ "model_id": model_id }),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn unload_model(
+    state: tauri::State<'_, crate::state::AppState>,
+    model_id: String,
+) -> Result<(), String> {
+    let mut sidecar = state.ml_sidecar.lock().await;
+    sidecar
+        .request("model.unload", serde_json::json!({ "model_id": model_id }))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn save_api_key(provider: String, key: String) -> Result<(), String> {
     let config_dir = get_config_dir().map_err(|e| e.to_string())?;

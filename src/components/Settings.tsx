@@ -6,8 +6,8 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
     const [activeTab, setActiveTab] = useState<'mcp' | 'tools' | 'models' | 'auth' | 'channels' | 'agents' | 'marketplace' | 'reset'>('mcp');
     const [mcpConfig, setMcpConfig] = useState<any>({});
     const [toolsConfig, setToolsConfig] = useState<any>({});
-    const [modelsConfig, setModelsConfig] = useState<any>({ models: [] });
-    // Marketplace Search
+    const [localModels, setLocalModels] = useState<any[]>([]);
+    const [downloading, setDownloading] = useState<Record<string, boolean>>({});
     const [searchQuery, setSearchQuery] = useState('');
 
     // Forms
@@ -44,8 +44,8 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
             setMcpConfig(mcp);
             const tools = await invoke('get_tools_config');
             setToolsConfig(tools);
-            const models = await invoke('get_models_config');
-            setModelsConfig(models);
+            const local = await invoke('list_local_models') as any[];
+            setLocalModels(local);
             const tg = await invoke('get_telegram_config');
             setTelegramConfig(tg);
             const dc = await invoke('get_discord_config');
@@ -94,10 +94,36 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
     async function handleLoadModel(id: string) {
         try {
             await invoke('load_model', { modelId: id, backend: localBackend === 'auto' ? null : localBackend });
+            refreshConfig();
             alert('Model loaded!');
         } catch (e) {
             console.error(e);
             alert('Failed to load model: ' + e);
+        }
+    }
+
+    async function handleUnloadModel(id: string) {
+        try {
+            await invoke('unload_model', { modelId: id });
+            refreshConfig();
+            alert('Model unloaded!');
+        } catch (e) {
+            console.error(e);
+            alert('Failed to unload model: ' + e);
+        }
+    }
+
+    async function handleDownloadModel(id: string) {
+        setDownloading(prev => ({ ...prev, [id]: true }));
+        try {
+            await invoke('download_model', { modelId: id });
+            refreshConfig();
+            alert('Download complete!');
+        } catch (e) {
+            console.error(e);
+            alert('Download failed: ' + e);
+        } finally {
+            setDownloading(prev => ({ ...prev, [id]: false }));
         }
     }
 
@@ -353,15 +379,53 @@ export default function Settings({ isOpen, onClose }: { isOpen: boolean; onClose
                     {activeTab === 'models' && (
                         <div className="space-y-6">
                             <div className="space-y-4">
-                                {modelsConfig.models.map((m: any) => (
-                                    <div key={m.id} className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800 p-3 rounded">
-                                        <div>
-                                            <div className="font-medium dark:text-white">{m.id}</div>
-                                            {m.description && <div className="text-xs text-zinc-500">{m.description}</div>}
+                                {localModels.map((m: any) => (
+                                    <div key={m.model_id} className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800 p-3 rounded">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className="font-medium dark:text-white">{m.model_id}</div>
+                                                {m.loaded && <span className="text-[10px] bg-green-500 text-white px-1.5 rounded-full">ACTIVE</span>}
+                                            </div>
+                                            <div className="text-xs text-zinc-500">
+                                                {m.backend} • {m.downloaded ? 'Offline' : 'Not Downloaded'}
+                                            </div>
                                         </div>
-                                        <button onClick={() => handleLoadModel(m.id)} className="bg-zinc-200 dark:bg-zinc-700 px-3 py-1 rounded text-sm hover:bg-zinc-300 dark:hover:bg-zinc-600 dark:text-white">Load</button>
+                                        <div className="flex gap-2">
+                                            {!m.downloaded ? (
+                                                <button
+                                                    onClick={() => handleDownloadModel(m.model_id)}
+                                                    disabled={downloading[m.model_id]}
+                                                    className="bg-blue-600/10 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 px-3 py-1 rounded text-sm hover:bg-blue-600/20 disabled:opacity-50"
+                                                >
+                                                    {downloading[m.model_id] ? 'Downloading...' : 'Download'}
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    {m.loaded ? (
+                                                        <button
+                                                            onClick={() => handleUnloadModel(m.model_id)}
+                                                            className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-3 py-1 rounded text-sm hover:bg-red-200"
+                                                        >
+                                                            Unload
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleLoadModel(m.model_id)}
+                                                            className="bg-zinc-200 dark:bg-zinc-700 px-3 py-1 rounded text-sm hover:bg-zinc-300 dark:text-white"
+                                                        >
+                                                            Load
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
+                                {localModels.length === 0 && (
+                                    <div className="text-center py-4 text-zinc-500 text-sm italic">
+                                        Loading model registry...
+                                    </div>
+                                )}
                             </div>
                             <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-4">
                                 <div>

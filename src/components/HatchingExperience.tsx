@@ -72,6 +72,8 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
             { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
         ],
         local: [
+            { id: 'deepseek-r1-32b', name: 'DeepSeek R1 (32B) ⚡' },
+            { id: 'llama-3.3-70b', name: 'Llama 3.3 (70B) 🔥' },
             { id: 'llama-3-8b', name: 'Llama 3 (8B)' },
             { id: 'mistral-7b', name: 'Mistral (7B)' },
         ]

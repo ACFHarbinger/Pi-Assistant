@@ -430,3 +430,6 @@ sidecar/.venv/
 
 # Secrets
 assets/secrets/*.json
+
+# Python
+*.egg-info/
