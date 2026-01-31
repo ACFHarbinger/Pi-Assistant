@@ -8,6 +8,7 @@ from ..enums import RunStatus
 @dataclass
 class RunInfo:
     """Information about a training run."""
+
     run_id: str
     status: RunStatus
     config: dict[str, Any]

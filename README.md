@@ -55,6 +55,14 @@
 [![Kubuntu](https://img.shields.io/badge/Kubuntu-0079C1?style=for-the-badge&logo=kubuntu&logoColor=white)](https://kubuntu.org/)
 [![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)](https://ubuntu.com/)
 
+**Quality & Standards**
+
+[![Ruff](https://img.shields.io/badge/Ruff-3670A0?style=for-the-badge&logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
+[![Mypy](https://img.shields.io/badge/Mypy-2A6DB2?style=for-the-badge&logo=python&logoColor=white)](https://mypy-lang.org/)
+[![Black](https://img.shields.io/badge/Code%20Style-Black-000000?style=for-the-badge&logo=black&logoColor=white)](https://github.com/psf/black)
+[![Prettier](https://img.shields.io/badge/Prettier-F7B93E?style=for-the-badge&logo=prettier&logoColor=black)](https://prettier.io/)
+[![Pre-commit](https://img.shields.io/badge/Pre--commit-F8B424?style=for-the-badge&logo=pre-commit&logoColor=black)](https://pre-commit.com/)
+
 A Universal Agent Harness — a desktop application that hosts an autonomous AI agent capable of controlling the computer, maintaining persistent memory, and training sub-models.
 
 Built with **Rust** (Tauri v2), **TypeScript** (React), **Python** (PyTorch Lightning), and **Kotlin** (Android).

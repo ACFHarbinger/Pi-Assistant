@@ -1,4 +1,5 @@
 """NDJSON transport over stdin/stdout for Rust <-> Python IPC."""
+
 from __future__ import annotations
 
 import asyncio

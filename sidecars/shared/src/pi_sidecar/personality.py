@@ -3,6 +3,7 @@ Personality module for Pi-Assistant.
 
 Loads soul.md and provides personality-aware system prompts.
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,7 +19,7 @@ class Personality:
     def __init__(self, workspace_path: str | None = None):
         """
         Initialize personality from soul.md.
-        
+
         Args:
             workspace_path: Path to workspace containing soul.md.
                            Defaults to Pi-Assistant root.
@@ -69,7 +70,7 @@ class Personality:
             lines = self._soul_content.split("\n")
             in_hatching = False
             hatching_lines = []
-            
+
             for line in lines:
                 if "First Encounter" in line or "Hatching" in line:
                     in_hatching = True
@@ -81,10 +82,10 @@ class Personality:
                         hatching_lines.append(line[1:].strip())
                     elif hatching_lines and line.strip():
                         hatching_lines.append(line.strip())
-            
+
             if hatching_lines:
                 return "\n".join(hatching_lines)
-        
+
         return DEFAULT_HATCHING_MESSAGE
 
     @property
@@ -93,6 +94,7 @@ class Personality:
         if self._soul_content:
             # Find "You are **[Name]**"
             import re
+
             match = re.search(r"You are \*\*([^\*]+)\*\*", self._soul_content)
             if match:
                 return match.group(1).strip()
@@ -103,12 +105,13 @@ class Personality:
         soul_path = Path(self._workspace) / "soul.md"
         if not soul_path.exists():
             return False
-        
+
         content = soul_path.read_text(encoding="utf-8")
         import re
+
         # Replace the first occurrence of "You are **[Name]**"
         new_content = re.sub(r"You are \*\*([^\*]+)\*\*", f"You are **{name}**", content, count=1)
-        
+
         try:
             soul_path.write_text(new_content, encoding="utf-8")
             self._soul_content = new_content
