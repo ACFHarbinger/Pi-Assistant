@@ -1,11 +1,44 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+
+// CSS for hatching animations (injected inline)
+const hatchingStyles = `
+@keyframes egg-shake {
+    0%, 100% { transform: rotate(0deg); }
+    10%, 30%, 50%, 70%, 90% { transform: rotate(-5deg); }
+    20%, 40%, 60%, 80% { transform: rotate(5deg); }
+}
+
+@keyframes egg-crack {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+    100% { opacity: 0; transform: scale(1.3) translateY(-20px); }
+}
+
+@keyframes emerge {
+    0% { opacity: 0; transform: scale(0.5) translateY(20px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.egg-shake {
+    animation: egg-shake 0.5s ease-in-out infinite;
+}
+
+.egg-crack {
+    animation: egg-crack 0.8s ease-out forwards;
+}
+
+.emerge {
+    animation: emerge 0.6s ease-out forwards;
+}
+`;
 
 interface HatchingExperienceProps {
     onComplete: () => void;
 }
 
 type WizardStep = 'welcome' | 'model' | 'api-key' | 'skills' | 'identity' | 'hatching';
+type HatchingPhase = 'shaking' | 'cracking' | 'emerging' | 'greeting' | 'chat';
 
 export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
     const [step, setStep] = useState<WizardStep>('welcome');
@@ -22,6 +55,11 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
     const [showAdvancedAuth, setShowAdvancedAuth] = useState(false);
     const [hatchMessages, setHatchMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
     const [input, setInput] = useState('');
+
+    // Hatching animation state
+    const [hatchingPhase, setHatchingPhase] = useState<HatchingPhase>('shaking');
+    const [greetingText, setGreetingText] = useState('');
+    const greetingRef = useRef<string>('');
 
     const models = {
         google: [
@@ -46,9 +84,60 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
         }
     }, [provider]);
 
-    // Start conversational hatching
+    // Hatching animation sequence
     useEffect(() => {
-        if (step === 'hatching' && hatchMessages.length === 0) {
+        if (step === 'hatching') {
+            // Phase 1: Shake for 2 seconds
+            const shakeTimer = setTimeout(() => {
+                setHatchingPhase('cracking');
+            }, 2000);
+
+            return () => clearTimeout(shakeTimer);
+        }
+    }, [step]);
+
+    useEffect(() => {
+        if (hatchingPhase === 'cracking') {
+            const crackTimer = setTimeout(() => {
+                setHatchingPhase('emerging');
+            }, 800);
+            return () => clearTimeout(crackTimer);
+        }
+    }, [hatchingPhase]);
+
+    useEffect(() => {
+        if (hatchingPhase === 'emerging') {
+            const emergeTimer = setTimeout(() => {
+                setHatchingPhase('greeting');
+                greetingRef.current = '';
+            }, 600);
+            return () => clearTimeout(emergeTimer);
+        }
+    }, [hatchingPhase]);
+
+    // Typewriter effect for greeting
+    useEffect(() => {
+        if (hatchingPhase === 'greeting') {
+            const greeting = `Hello! I'm ${agentName}. I've just hatched and I'm excited to help you. What would you like to do first?`;
+            let i = 0;
+            const typeTimer = setInterval(() => {
+                if (i < greeting.length) {
+                    greetingRef.current += greeting[i];
+                    setGreetingText(greetingRef.current);
+                    i++;
+                } else {
+                    clearInterval(typeTimer);
+                    // After greeting is done, transition to chat
+                    setTimeout(() => setHatchingPhase('chat'), 1000);
+                }
+            }, 30);
+            return () => clearInterval(typeTimer);
+        }
+    }, [hatchingPhase, agentName]);
+
+    // Start interactive hatching chat after animation
+    useEffect(() => {
+        if (hatchingPhase === 'chat' && hatchMessages.length === 0) {
             const startHatching = async () => {
                 setIsLoading(true);
                 try {
@@ -70,7 +159,7 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
             };
             startHatching();
         }
-    }, [step]);
+    }, [hatchingPhase]);
 
     const handleHatchSend = async () => {
         if (!input.trim() || isLoading) return;
@@ -433,68 +522,115 @@ export function HatchingExperience({ onComplete }: HatchingExperienceProps) {
                         </div>
                     )}
 
-                    {/* Hatching Step (Interactive Chat) */}
+                    {/* Hatching Step (Animated + Interactive Chat) */}
                     {step === 'hatching' && (
-                        <div className="space-y-6 flex flex-col h-[500px]">
-                            <div className="flex items-center gap-4 mb-2">
-                                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/20">
-                                    <span className="text-xl text-white">🤖</span>
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-white leading-tight">Pi is Ready</h2>
-                                    <p className="text-xs text-gray-500 uppercase font-bold tracking-widest leading-tight">Interactive Hatching</p>
-                                </div>
-                                <button
-                                    onClick={handleComplete}
-                                    className="ml-auto px-4 py-2 bg-primary-600/20 hover:bg-primary-600 text-primary-400 hover:text-white border border-primary-500/30 rounded-xl text-xs font-bold transition-all"
-                                >
-                                    Begin Journey
-                                </button>
-                            </div>
+                        <>
+                            {/* Inject animation CSS */}
+                            <style dangerouslySetInnerHTML={{ __html: hatchingStyles }} />
 
-                            <div className="flex-1 bg-black/40 rounded-2xl border border-white/5 p-4 overflow-y-auto space-y-4 custom-scrollbar">
-                                {hatchMessages.map((msg, i) => (
-                                    <div key={i} className={`flex ${msg.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
-                                        <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'assistant'
-                                            ? 'bg-gray-800 text-gray-100 rounded-tl-none border border-white/5'
-                                            : 'bg-primary-600 text-white rounded-tr-none shadow-lg shadow-primary-600/10'
-                                            }`}>
-                                            {formatMessage(msg.content)}
+                            {/* Animation Phases: Shaking, Cracking, Emerging */}
+                            {(hatchingPhase === 'shaking' || hatchingPhase === 'cracking' || hatchingPhase === 'emerging') && (
+                                <div className="flex flex-col items-center justify-center h-[400px] space-y-8">
+                                    {/* Egg during shaking/cracking */}
+                                    {hatchingPhase !== 'emerging' && (
+                                        <div className={`text-8xl ${hatchingPhase === 'shaking' ? 'egg-shake' : 'egg-crack'}`}>
+                                            🥚
                                         </div>
+                                    )}
+
+                                    {/* Robot during emerging */}
+                                    {hatchingPhase === 'emerging' && (
+                                        <div className="text-8xl emerge">
+                                            🤖
+                                        </div>
+                                    )}
+
+                                    <p className="text-gray-400 text-lg font-medium animate-pulse">
+                                        {hatchingPhase === 'shaking' && 'Something is happening...'}
+                                        {hatchingPhase === 'cracking' && 'Hatching!'}
+                                        {hatchingPhase === 'emerging' && `${agentName} is here!`}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Greeting Phase with Typewriter */}
+                            {hatchingPhase === 'greeting' && (
+                                <div className="flex flex-col items-center justify-center h-[400px] space-y-6">
+                                    <div className="w-24 h-24 bg-gradient-to-br from-primary-500 to-accent-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-primary-500/30 emerge">
+                                        <span className="text-5xl">🤖</span>
                                     </div>
-                                ))}
-                                {isLoading && hatchMessages.length > 0 && (
-                                    <div className="flex justify-start">
-                                        <div className="bg-gray-800 p-3 rounded-2xl rounded-tl-none animate-pulse">
-                                            <div className="flex gap-1">
-                                                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" />
-                                                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]" />
-                                                <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+                                    <h2 className="text-2xl font-bold text-white">{agentName}</h2>
+                                    <p className="text-gray-300 text-center max-w-md leading-relaxed">
+                                        {greetingText}
+                                        <span className="animate-pulse">|</span>
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Interactive Chat Phase */}
+                            {hatchingPhase === 'chat' && (
+                                <div className="space-y-6 flex flex-col h-[500px]">
+                                    <div className="flex items-center gap-4 mb-2">
+                                        <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/20">
+                                            <span className="text-xl text-white">🤖</span>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-bold text-white leading-tight">{agentName} is Ready</h2>
+                                            <p className="text-xs text-gray-500 uppercase font-bold tracking-widest leading-tight">Interactive Hatching</p>
+                                        </div>
+                                        <button
+                                            onClick={handleComplete}
+                                            className="ml-auto px-4 py-2 bg-primary-600/20 hover:bg-primary-600 text-primary-400 hover:text-white border border-primary-500/30 rounded-xl text-xs font-bold transition-all"
+                                        >
+                                            Begin Journey
+                                        </button>
+                                    </div>
+
+                                    <div className="flex-1 bg-black/40 rounded-2xl border border-white/5 p-4 overflow-y-auto space-y-4 custom-scrollbar">
+                                        {hatchMessages.map((msg, i) => (
+                                            <div key={i} className={`flex ${msg.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
+                                                <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'assistant'
+                                                    ? 'bg-gray-800 text-gray-100 rounded-tl-none border border-white/5'
+                                                    : 'bg-primary-600 text-white rounded-tr-none shadow-lg shadow-primary-600/10'
+                                                    }`}>
+                                                    {formatMessage(msg.content)}
+                                                </div>
                                             </div>
-                                        </div>
+                                        ))}
+                                        {isLoading && hatchMessages.length > 0 && (
+                                            <div className="flex justify-start">
+                                                <div className="bg-gray-800 p-3 rounded-2xl rounded-tl-none animate-pulse">
+                                                    <div className="flex gap-1">
+                                                        <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" />
+                                                        <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                                        <div className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
 
-                            <div className="relative mt-2">
-                                <input
-                                    type="text"
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleHatchSend()}
-                                    placeholder="Talk to your new friend..."
-                                    disabled={isLoading}
-                                    className="w-full p-4 pr-14 bg-white/5 border border-white/10 rounded-2xl text-white focus:border-primary-500 outline-none transition-all"
-                                />
-                                <button
-                                    onClick={handleHatchSend}
-                                    disabled={isLoading || !input.trim()}
-                                    className="absolute right-2 top-2 bottom-2 px-4 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-500 disabled:opacity-50 transition-all"
-                                >
-                                    Send
-                                </button>
-                            </div>
-                        </div>
+                                    <div className="relative mt-2">
+                                        <input
+                                            type="text"
+                                            value={input}
+                                            onChange={(e) => setInput(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleHatchSend()}
+                                            placeholder="Talk to your new friend..."
+                                            disabled={isLoading}
+                                            className="w-full p-4 pr-14 bg-white/5 border border-white/10 rounded-2xl text-white focus:border-primary-500 outline-none transition-all"
+                                        />
+                                        <button
+                                            onClick={handleHatchSend}
+                                            disabled={isLoading || !input.trim()}
+                                            className="absolute right-2 top-2 bottom-2 px-4 bg-primary-600 text-white rounded-xl font-bold text-sm hover:bg-primary-500 disabled:opacity-50 transition-all"
+                                        >
+                                            Send
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

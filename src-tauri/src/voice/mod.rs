@@ -195,6 +195,22 @@ impl VoiceManager {
         Ok(path)
     }
 
+    /// Cancel current push-to-talk recording without transcribing.
+    pub async fn push_to_talk_cancel(&mut self) -> anyhow::Result<()> {
+        if !self.is_ptt_recording {
+            return Ok(());
+        }
+
+        let mut recorder = self.recorder.lock().await;
+        recorder.take_buffer();
+        recorder.stop();
+        drop(recorder);
+
+        self.is_ptt_recording = false;
+        info!("Push-to-talk recording cancelled and buffer cleared");
+        Ok(())
+    }
+
     /// Check if the wake-word listener is active.
     pub fn is_listening(&self) -> bool {
         self.is_wake_listening

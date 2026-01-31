@@ -24,7 +24,7 @@ impl Tool for CanvasTool {
     }
 
     fn description(&self) -> &str {
-        "Push HTML content to the Live Canvas for visual output. Actions: push, clear, snapshot."
+        "Push HTML content to the Live Canvas for visual output. Actions: push, clear, eval."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -33,12 +33,16 @@ impl Tool for CanvasTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["push", "clear"],
+                    "enum": ["push", "clear", "eval"],
                     "description": "Action to perform on the canvas"
                 },
                 "content": {
                     "type": "string",
                     "description": "HTML content to push (required for 'push' action)"
+                },
+                "code": {
+                    "type": "string",
+                    "description": "JavaScript code to execute (required for 'eval' action)"
                 }
             },
             "required": ["action"]
@@ -69,6 +73,19 @@ impl Tool for CanvasTool {
                 self.app_handle.emit("canvas-clear", ())?;
 
                 Ok(ToolResult::success("Canvas cleared"))
+            }
+            "eval" => {
+                let code = params
+                    .get("code")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing code for eval action"))?;
+
+                self.app_handle.emit("canvas-eval", code)?;
+
+                Ok(ToolResult::success(format!(
+                    "Executed {} bytes of JavaScript in canvas",
+                    code.len()
+                )))
             }
             _ => Err(anyhow::anyhow!("Unknown action: {}", action)),
         }

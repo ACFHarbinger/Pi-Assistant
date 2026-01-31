@@ -21,9 +21,26 @@ export const Canvas: React.FC<CanvasProps> = ({ isOpen, onClose }) => {
             setContent('');
         });
 
+        const unlistenEval = listen<string>('canvas-eval', (event) => {
+            if (iframeRef.current && iframeRef.current.contentWindow) {
+                // Execute JavaScript in the iframe using postMessage
+                const code = event.payload;
+                try {
+                    // Use Function constructor for safer eval (still sandbox protected)
+                    iframeRef.current.contentWindow.postMessage(
+                        { type: 'pi-canvas-eval', code },
+                        '*'
+                    );
+                } catch (e) {
+                    console.error('Failed to eval in canvas:', e);
+                }
+            }
+        });
+
         return () => {
             unlisten.then((fn) => fn());
             unlistenClear.then((fn) => fn());
+            unlistenEval.then((fn) => fn());
         };
     }, []);
 
@@ -31,8 +48,22 @@ export const Canvas: React.FC<CanvasProps> = ({ isOpen, onClose }) => {
         if (iframeRef.current && content) {
             const doc = iframeRef.current.contentDocument;
             if (doc) {
+                // Inject the eval listener into the iframe content
+                const evalHandler = `
+                    <script>
+                        window.addEventListener('message', function(event) {
+                            if (event.data && event.data.type === 'pi-canvas-eval') {
+                                try {
+                                    eval(event.data.code);
+                                } catch (e) {
+                                    console.error('Canvas eval error:', e);
+                                }
+                            }
+                        });
+                    </script>
+                `;
                 doc.open();
-                doc.write(content);
+                doc.write(evalHandler + content);
                 doc.close();
             }
         }

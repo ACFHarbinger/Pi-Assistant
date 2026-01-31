@@ -8,6 +8,7 @@ export function AgentStatus() {
         Running: { color: "bg-green-500", label: "Running", pulse: true },
         Paused: { color: "bg-yellow-500", label: "Paused", pulse: false },
         Stopped: { color: "bg-red-500", label: "Stopped", pulse: false },
+        AssistantMessage: { color: "bg-indigo-500", label: "Agent Talking", pulse: true },
     };
 
     const config = statusConfig[state.status] || statusConfig.Idle;

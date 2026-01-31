@@ -157,6 +157,24 @@ impl AgentPool {
             .map_err(|e| anyhow::anyhow!("Failed to send command to agent: {}", e))
     }
 
+    /// Send a command directly to a specific agent by name.
+    pub async fn send_to_agent(
+        &self,
+        agent_name: &str,
+        command: AgentCommand,
+    ) -> anyhow::Result<()> {
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_name)
+            .ok_or_else(|| anyhow::anyhow!("Agent '{}' not found", agent_name))?;
+
+        agent
+            .cmd_tx
+            .send(command)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to send command to agent '{}': {}", agent_name, e))
+    }
+
     /// Start an agent task.
     pub async fn start_agent_task(&self, agent_name: &str, task: AgentTask) -> anyhow::Result<()> {
         let mut agents = self.agents.write().await;

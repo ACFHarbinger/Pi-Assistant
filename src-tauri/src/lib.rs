@@ -109,6 +109,7 @@ pub fn run() {
                                     Box::new(crate::channels::discord::DiscordChannel::new(
                                         token,
                                         state.agent_cmd_tx.clone(),
+                                        state.agent_state_rx.clone(),
                                     ));
                                 state.channel_manager.add_channel(channel).await;
                                 let _ = state.channel_manager.start_channel("discord").await;
@@ -155,6 +156,7 @@ pub fn run() {
             commands::voice::stop_voice_listener,
             commands::voice::push_to_talk_start,
             commands::voice::push_to_talk_stop,
+            commands::voice::push_to_talk_cancel,
             commands::auth::start_oauth,
             commands::auth::exchange_oauth_code,
             commands::auth::start_claude_oauth,

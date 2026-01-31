@@ -1,6 +1,7 @@
 //! Session tool for agent management.
 
 use async_trait::async_trait;
+use pi_core::agent_types::AgentCommand;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -11,11 +12,13 @@ use crate::tools::{PermissionTier, Tool, ToolResult};
 /// Tool for managing agent sessions.
 pub struct SessionTool {
     pool: Arc<RwLock<AgentPool>>,
+    /// This agent's ID for message sending
+    agent_id: String,
 }
 
 impl SessionTool {
-    pub fn new(pool: Arc<RwLock<AgentPool>>) -> Self {
-        Self { pool }
+    pub fn new(pool: Arc<RwLock<AgentPool>>, agent_id: String) -> Self {
+        Self { pool, agent_id }
     }
 }
 
@@ -26,7 +29,7 @@ impl Tool for SessionTool {
     }
 
     fn description(&self) -> &str {
-        "Manage agent sessions. Actions: list, create, remove, route."
+        "Manage agent sessions. Actions: list, create, remove, route, message."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -35,7 +38,7 @@ impl Tool for SessionTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["list", "create", "remove", "route"],
+                    "enum": ["list", "create", "remove", "route", "message"],
                     "description": "Action to perform"
                 },
                 "name": {
@@ -48,7 +51,11 @@ impl Tool for SessionTool {
                 },
                 "agent": {
                     "type": "string",
-                    "description": "Target agent name (for route)"
+                    "description": "Target agent name (for route/message)"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Message content (for message action)"
                 }
             },
             "required": ["action"]
@@ -117,6 +124,30 @@ impl Tool for SessionTool {
                 Ok(ToolResult::success(format!(
                     "Routed channel '{}' to agent '{}'",
                     channel, agent
+                )))
+            }
+            "message" => {
+                let target = params
+                    .get("agent")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing agent for message action"))?;
+
+                let content = params
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Missing content for message action"))?;
+
+                let cmd = AgentCommand::InternalMessage {
+                    from_agent_id: self.agent_id.clone(),
+                    to_agent_id: target.to_string(),
+                    content: content.to_string(),
+                };
+
+                pool.send_to_agent(target, cmd).await?;
+
+                Ok(ToolResult::success(format!(
+                    "Sent message to agent '{}'",
+                    target
                 )))
             }
             _ => Err(anyhow::anyhow!("Unknown action: {}", action)),

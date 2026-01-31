@@ -41,6 +41,8 @@ dirs = "5"
 base64 = "0.22"
 url = "2"
 sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
 rand = "0.8"
 teloxide = { version = "0.14", default-features = false, features = [
     "macros",

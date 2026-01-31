@@ -88,6 +88,12 @@ pub enum AgentCommand {
         #[serde(default)]
         media: Vec<HashMap<String, String>>,
     },
+    /// Internal message from another agent
+    InternalMessage {
+        from_agent_id: String,
+        to_agent_id: String,
+        content: String,
+    },
 }
 
 /// Plan returned by the LLM planner.

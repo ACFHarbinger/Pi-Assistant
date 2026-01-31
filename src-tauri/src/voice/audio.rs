@@ -3,6 +3,84 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::{Arc, Mutex};
 use tracing::{error, info};
 
+// File descriptor redirection for suppressing library-level noise
+#[cfg(target_os = "linux")]
+struct SilenceStderr {
+    backup_fd: i32,
+}
+
+#[cfg(target_os = "linux")]
+impl SilenceStderr {
+    fn new() -> Self {
+        unsafe {
+            let stderr_fd = 2;
+            let backup_fd = libc_dup(stderr_fd);
+
+            // O_WRONLY = 1
+            let null_path = "/dev/null\0";
+            let null_fd = libc_open(null_path.as_ptr() as *const i8, 1);
+
+            if null_fd >= 0 {
+                libc_dup2(null_fd, stderr_fd);
+                libc_close(null_fd);
+            }
+
+            Self { backup_fd }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for SilenceStderr {
+    fn drop(&mut self) {
+        if self.backup_fd >= 0 {
+            unsafe {
+                libc_dup2(self.backup_fd, 2);
+                libc_close(self.backup_fd);
+            }
+        }
+    }
+}
+
+extern "C" {
+    #[link_name = "dup"]
+    fn libc_dup(fd: i32) -> i32;
+    #[link_name = "dup2"]
+    fn libc_dup2(oldfd: i32, newfd: i32) -> i32;
+    #[link_name = "close"]
+    fn libc_close(fd: i32) -> i32;
+    #[link_name = "open"]
+    fn libc_open(path: *const i8, flags: i32) -> i32;
+}
+
+// Handle ALSA error messages by silencing them (backup mechanism)
+#[cfg(target_os = "linux")]
+fn silence_alsa_errors() {
+    use std::os::raw::{c_char, c_int};
+
+    // We declare the handler without variadic arguments for compatibility with Rust function definition
+    type AlsaErrorHandler =
+        unsafe extern "C" fn(*const c_char, c_int, *const c_char, c_int, *const c_char);
+
+    extern "C" {
+        // We tell Rust the function takes our non-variadic handler
+        fn snd_lib_error_set_handler(handler: Option<AlsaErrorHandler>) -> c_int;
+    }
+
+    unsafe extern "C" fn dummy_error_handler(
+        _file: *const c_char,
+        _line: c_int,
+        _function: *const c_char,
+        _err: c_int,
+        _fmt: *const c_char,
+    ) {
+    }
+
+    unsafe {
+        let _ = snd_lib_error_set_handler(Some(dummy_error_handler));
+    }
+}
+
 pub struct AudioRecorder {
     stream: Option<SendSafeStream>,
     buffer: Arc<Mutex<Vec<f32>>>,
@@ -21,6 +99,9 @@ impl std::ops::Deref for SendSafeStream {
 
 impl AudioRecorder {
     pub fn new() -> Self {
+        #[cfg(target_os = "linux")]
+        silence_alsa_errors();
+
         Self {
             stream: None,
             buffer: Arc::new(Mutex::new(Vec::new())),
@@ -29,19 +110,32 @@ impl AudioRecorder {
 
     pub fn start(&mut self) -> Result<()> {
         let host = cpal::default_host();
-        let devices = host.input_devices()?;
+        let host_id = host.id();
+        info!("Using audio host: {:?}", host_id);
 
-        let device = devices
-            .filter(|d| {
-                d.name()
-                    .map(|n| {
-                        n.to_lowercase().contains("pulse") || n.to_lowercase().contains("pipewire")
-                    })
-                    .unwrap_or(false)
-            })
-            .next()
-            .or_else(|| host.default_input_device())
-            .ok_or_else(|| anyhow!("No suitable input device found"))?;
+        let device = {
+            #[cfg(target_os = "linux")]
+            let _silence = SilenceStderr::new();
+
+            let devices = host.input_devices()?;
+
+            devices
+                .filter(|d| {
+                    d.name()
+                        .map(|n| {
+                            let name = n.to_lowercase();
+                            // Prefer pulse/pipewire devices, avoid OSS (/dev/dsp) which is noisy
+                            (name.contains("pulse")
+                                || name.contains("pipewire")
+                                || name.contains("default"))
+                                && !name.contains("oss")
+                        })
+                        .unwrap_or(false)
+                })
+                .next()
+                .or_else(|| host.default_input_device())
+                .ok_or_else(|| anyhow!("No suitable input device found"))?
+        };
 
         info!("Using input device: {}", device.name()?);
 

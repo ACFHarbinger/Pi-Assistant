@@ -7,17 +7,22 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serenity::all::{ChannelId, GatewayIntents, Message, Ready};
+use serenity::all::{
+    ChannelId, Command, CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, CreateInteractionResponseMessage, GatewayIntents, Interaction,
+    Message, Ready,
+};
 use serenity::prelude::*;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, watch, Mutex};
 use tracing::{error, info};
 
 use super::{Channel, ChannelMessage, ChannelResponse};
-use pi_core::agent_types::AgentCommand;
+use pi_core::agent_types::{AgentCommand, AgentState};
 
 struct Handler {
     message_tx: mpsc::Sender<AgentCommand>,
     bot_id: Mutex<Option<serenity::all::UserId>>,
+    agent_state_rx: watch::Receiver<AgentState>,
 }
 
 #[async_trait]
@@ -82,9 +87,92 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::Command(command) = interaction {
+            let response_content = self.handle_slash_command(&command).await;
+
+            let response = CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new().content(response_content),
+            );
+
+            if let Err(e) = command.create_response(&ctx.http, response).await {
+                error!("Failed to respond to slash command: {}", e);
+            }
+        }
+    }
+
+    async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Discord bot '{}' is connected!", ready.user.name);
         *self.bot_id.lock().await = Some(ready.user.id);
+
+        // Register global slash commands
+        let commands = vec![
+            CreateCommand::new("ask")
+                .description("Send a message to Pi-Assistant")
+                .add_option(
+                    CreateCommandOption::new(CommandOptionType::String, "message", "Your message")
+                        .required(true),
+                ),
+            CreateCommand::new("status").description("Get the current agent status"),
+            CreateCommand::new("stop").description("Stop the currently running agent task"),
+        ];
+
+        for command in commands {
+            if let Err(e) = Command::create_global_command(&ctx.http, command).await {
+                error!("Failed to register slash command: {}", e);
+            }
+        }
+
+        info!("Slash commands registered successfully");
+    }
+}
+
+impl Handler {
+    async fn handle_slash_command(&self, command: &CommandInteraction) -> String {
+        match command.data.name.as_str() {
+            "ask" => {
+                let message = command
+                    .data
+                    .options
+                    .first()
+                    .and_then(|opt| opt.value.as_str())
+                    .unwrap_or("Hello!");
+
+                let _ = self
+                    .message_tx
+                    .send(AgentCommand::ChannelMessage {
+                        id: command.id.to_string(),
+                        channel: "discord".to_string(),
+                        sender_id: command.user.id.to_string(),
+                        sender_name: Some(command.user.name.clone()),
+                        text: message.to_string(),
+                        chat_id: command.channel_id.to_string(),
+                        media: vec![],
+                    })
+                    .await;
+
+                format!("📨 Message sent to Pi: \"{}\"", message)
+            }
+            "status" => {
+                let state = self.agent_state_rx.borrow().clone();
+                match state {
+                    AgentState::Idle => "🟢 Agent is idle and ready.".to_string(),
+                    AgentState::Running { iteration, .. } => {
+                        format!("🔄 Agent is running (iteration {}).", iteration)
+                    }
+                    AgentState::Paused { .. } => "⏸️ Agent is paused.".to_string(),
+                    AgentState::Stopped { reason, .. } => {
+                        format!("🛑 Agent stopped: {:?}", reason)
+                    }
+                    _ => "❓ Unknown state.".to_string(),
+                }
+            }
+            "stop" => {
+                let _ = self.message_tx.send(AgentCommand::Stop).await;
+                "🛑 Stop command sent to agent.".to_string()
+            }
+            _ => "❓ Unknown command.".to_string(),
+        }
     }
 }
 
@@ -96,17 +184,24 @@ pub struct DiscordChannel {
     running: Arc<AtomicBool>,
     /// Message sender to forward messages to agent
     message_tx: mpsc::Sender<AgentCommand>,
+    /// Agent state receiver for status queries
+    agent_state_rx: watch::Receiver<AgentState>,
     /// Shutdown signal sender
     shard_manager: Arc<Mutex<Option<Arc<serenity::all::ShardManager>>>>,
 }
 
 impl DiscordChannel {
     /// Create a new Discord channel.
-    pub fn new(token: String, message_tx: mpsc::Sender<AgentCommand>) -> Self {
+    pub fn new(
+        token: String,
+        message_tx: mpsc::Sender<AgentCommand>,
+        agent_state_rx: watch::Receiver<AgentState>,
+    ) -> Self {
         Self {
             token,
             running: Arc::new(AtomicBool::new(false)),
             message_tx,
+            agent_state_rx,
             shard_manager: Arc::new(Mutex::new(None)),
         }
     }
@@ -132,6 +227,7 @@ impl Channel for DiscordChannel {
         let handler = Handler {
             message_tx: self.message_tx.clone(),
             bot_id: Mutex::new(None),
+            agent_state_rx: self.agent_state_rx.clone(),
         };
 
         let mut client = Client::builder(&self.token, intents)

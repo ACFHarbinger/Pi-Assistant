@@ -93,3 +93,14 @@ pub async fn push_to_talk_stop(state: State<'_, AppState>) -> Result<String, Str
 
     Ok(transcription)
 }
+
+#[tauri::command]
+pub async fn push_to_talk_cancel(state: State<'_, AppState>) -> Result<(), String> {
+    info!("Push-to-talk: cancelling recording...");
+    let mut voice_manager = state.voice_manager.lock().await;
+    voice_manager
+        .push_to_talk_cancel()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}

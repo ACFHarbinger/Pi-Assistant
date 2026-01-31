@@ -503,6 +503,7 @@ pub async fn save_discord_config(
             let channel = Box::new(crate::channels::discord::DiscordChannel::new(
                 token.clone(),
                 state.agent_cmd_tx.clone(),
+                state.agent_state_rx.clone(),
             ));
 
             state.channel_manager.add_channel(channel).await;
