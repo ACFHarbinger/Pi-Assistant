@@ -21,27 +21,26 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let (agent_state_tx, agent_state_rx) = watch::channel(AgentState::Idle);
         let (agent_cmd_tx, agent_cmd_rx) = mpsc::channel(32);
 
         let memory = MemoryManager::new(None).expect("Failed to initialize memory");
+
+        let mut tool_registry = ToolRegistry::new();
+        if let Err(e) = tool_registry.load_mcp_tools().await {
+            tracing::warn!("Failed to load MCP tools: {}", e);
+        }
 
         Self {
             agent_state_tx,
             agent_state_rx,
             agent_cmd_tx,
             agent_cmd_rx: Arc::new(Mutex::new(agent_cmd_rx)),
-            tool_registry: Arc::new(ToolRegistry::new()),
+            tool_registry: Arc::new(tool_registry),
             permissions: Arc::new(Mutex::new(PermissionEngine::new())),
             memory: Arc::new(memory),
             sidecar: Arc::new(Mutex::new(SidecarHandle::new())),
         }
-    }
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self::new()
     }
 }

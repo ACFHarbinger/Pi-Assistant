@@ -1,6 +1,5 @@
 package dev.piassistant.android.ui.screens
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,6 +28,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.piassistant.android.ui.components.ChatBubble
 import dev.piassistant.android.ui.components.PermissionCard
 import dev.piassistant.android.ui.components.StatusIndicator
+import dev.piassistant.android.ui.components.VoiceInputButton
 import dev.piassistant.android.viewmodel.ChatViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,44 +41,35 @@ fun HomeScreen(viewModel: ChatViewModel = viewModel()) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Header
         CenterAlignedTopAppBar(
-            title = { Text("Pi-Assistant") },
-            actions = {
-                StatusIndicator(state = state, isConnected = isConnected)
-            }
+                title = { Text("Pi-Assistant") },
+                actions = { StatusIndicator(state = state, isConnected = isConnected) }
         )
 
         // Chat List
         LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(16.dp),
-            contentPadding = PaddingValues(bottom = 16.dp)
-        ) {
-            items(messages) { msg ->
-                ChatBubble(msg)
-            }
-        }
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
+        ) { items(messages) { msg -> ChatBubble(msg) } }
 
         // Permission Request Overlay
         state?.data?.awaiting_permission?.let { req ->
             PermissionCard(
-                request = req,
-                onApprove = { remember -> viewModel.approvePermission(req.id, remember) },
-                onDeny = { viewModel.denyPermission(req.id) }
+                    request = req,
+                    onApprove = { remember -> viewModel.approvePermission(req.id, remember) },
+                    onDeny = { viewModel.denyPermission(req.id) }
             )
         }
 
         // Input Area
         InputArea(
-            onSend = { text ->
-                if (state?.status == "Idle") {
-                    viewModel.startTask(text)
-                } else if (state?.data?.question != null) {
-                    viewModel.sendAnswer(text)
-                }
-            },
-            enabled = isConnected && (state?.status == "Idle" || state?.data?.question != null)
+                onSend = { text ->
+                    if (state?.status == "Idle") {
+                        viewModel.startTask(text)
+                    } else if (state?.data?.question != null) {
+                        viewModel.sendAnswer(text)
+                    }
+                },
+                enabled = isConnected && (state?.status == "Idle" || state?.data?.question != null)
         )
     }
 }
@@ -88,29 +79,34 @@ fun InputArea(onSend: (String) -> Unit, enabled: Boolean) {
     var text by remember { mutableStateOf("") }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
     ) {
         OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            modifier = Modifier.weight(1f),
-            enabled = enabled,
-            placeholder = { Text("Enter task or reply...") }
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.weight(1f),
+                enabled = enabled,
+                placeholder = { Text("Enter task or reply...") }
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        VoiceInputButton(
+                onResult = { recognizedText ->
+                    if (recognizedText.isNotBlank()) {
+                        text = recognizedText
+                    }
+                },
+                modifier = Modifier.align(Alignment.CenterVertically)
         )
         Spacer(modifier = Modifier.width(8.dp))
         Button(
-            onClick = {
-                if (text.isNotBlank()) {
-                    onSend(text)
-                    text = ""
-                }
-            },
-            enabled = enabled && text.isNotBlank()
-        ) {
-            Text("Send")
-        }
+                onClick = {
+                    if (text.isNotBlank()) {
+                        onSend(text)
+                        text = ""
+                    }
+                },
+                enabled = enabled && text.isNotBlank()
+        ) { Text("Send") }
     }
 }

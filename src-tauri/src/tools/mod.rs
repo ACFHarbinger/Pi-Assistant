@@ -132,6 +132,40 @@ impl ToolRegistry {
             })
             .collect()
     }
+
+    /// Load tools from MCP configuration.
+    pub async fn load_mcp_tools(&mut self) -> Result<()> {
+        use crate::mcp::McpConfig;
+        use crate::tools::mcp::McpToolWrapper;
+        use tracing::info;
+
+        // Load config from ~/.pi-assistant/mcp_config.json
+        let config = McpConfig::load().await?;
+
+        for (server_name, server_config) in config.mcp_servers {
+            match crate::mcp::McpClient::new(&server_name, &server_config).await {
+                Ok(client) => {
+                    let client: Arc<crate::mcp::McpClient> = Arc::new(client);
+                    match client.list_tools().await {
+                        Ok(tools) => {
+                            for tool_info in tools {
+                                info!(tool = %tool_info.name, server = %server_name, "Registering MCP tool");
+                                let tool = Arc::new(McpToolWrapper::new(client.clone(), tool_info));
+                                self.register(tool);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(server = %server_name, error = %e, "Failed to list MCP tools");
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(server = %server_name, error = %e, "Failed to start MCP server");
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Default for ToolRegistry {
@@ -139,3 +173,4 @@ impl Default for ToolRegistry {
         Self::new()
     }
 }
+pub mod mcp;

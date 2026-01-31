@@ -5,6 +5,7 @@ use tauri::Manager;
 pub mod agent;
 pub mod commands;
 pub mod ipc;
+pub mod mcp;
 pub mod memory;
 pub mod safety;
 pub mod state;
@@ -25,8 +26,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            let state = state::AppState::new();
-            app.manage(state);
+            tauri::async_runtime::block_on(async {
+                let state = state::AppState::new().await;
+                app.manage(state);
+            });
             tracing::info!("Application state initialized");
             Ok(())
         })
