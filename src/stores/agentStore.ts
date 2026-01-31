@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 
+interface PermissionRequest {
+    id: string;
+    tool_name: string;
+    command: string;
+    tier: string;
+    description: string;
+}
+
 interface AgentState {
     status: "Idle" | "Running" | "Paused" | "Stopped";
     data?: {
@@ -8,6 +16,7 @@ interface AgentState {
         iteration?: number;
         question?: string;
         reason?: string;
+        awaiting_permission?: PermissionRequest;
     };
 }
 

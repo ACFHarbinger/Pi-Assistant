@@ -2,6 +2,7 @@ import { useAgentStore } from "./stores/agentStore";
 import { AgentStatus } from "./components/AgentStatus";
 import { ChatInterface } from "./components/ChatInterface.tsx";
 import { TaskInput } from "./components/TaskInput.tsx";
+import { PermissionDialog } from "./components/PermissionDialog.tsx";
 
 function App() {
     const { state } = useAgentStore();
@@ -58,6 +59,9 @@ function App() {
                     </div>
                 </div>
             </main>
+
+            {/* Permission Dialog */}
+            <PermissionDialog />
         </div>
     );
 }
