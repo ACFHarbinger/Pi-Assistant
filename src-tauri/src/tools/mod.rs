@@ -3,12 +3,14 @@
 pub mod browser;
 pub mod code;
 pub mod shell;
+pub mod training;
 
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // Re-export ToolCall from pi-core
 pub use pi_core::agent_types::ToolCall;
@@ -87,7 +89,7 @@ pub struct ToolRegistry {
 
 impl ToolRegistry {
     /// Create a new registry with default tools.
-    pub fn new() -> Self {
+    pub fn new(sidecar: Arc<Mutex<crate::ipc::SidecarHandle>>) -> Self {
         let mut registry = Self {
             tools: HashMap::new(),
         };
@@ -95,6 +97,7 @@ impl ToolRegistry {
         // Register default tools
         registry.register(Arc::new(shell::ShellTool::new()));
         registry.register(Arc::new(code::CodeTool::new()));
+        registry.register(Arc::new(training::TrainingTool::new(sidecar)));
 
         registry
     }
@@ -168,11 +171,7 @@ impl ToolRegistry {
     }
 }
 
-impl Default for ToolRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// ToolRegistry no longer implements Default as it requires a SidecarHandle
 pub mod mcp;
 
 #[cfg(test)]
@@ -202,7 +201,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_registry_register_and_get() {
-        let mut registry = ToolRegistry::new();
+        let sidecar = Arc::new(Mutex::new(crate::ipc::SidecarHandle::new()));
+        let mut registry = ToolRegistry::new(sidecar);
         registry.register(Arc::new(MockTool));
         assert!(registry.get("mock").is_some());
         assert!(registry.get("nonexistent").is_none());
@@ -210,7 +210,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_registry_execute() {
-        let mut registry = ToolRegistry::new();
+        let sidecar = Arc::new(Mutex::new(crate::ipc::SidecarHandle::new()));
+        let mut registry = ToolRegistry::new(sidecar);
         registry.register(Arc::new(MockTool));
 
         let call = ToolCall {
@@ -225,8 +226,10 @@ mod tests {
 
     #[test]
     fn test_default_tools_exist() {
-        let registry = ToolRegistry::new();
+        let sidecar = Arc::new(Mutex::new(crate::ipc::SidecarHandle::new()));
+        let registry = ToolRegistry::new(sidecar);
         assert!(registry.get("shell").is_some());
         assert!(registry.get("code").is_some());
+        assert!(registry.get("train").is_some());
     }
 }

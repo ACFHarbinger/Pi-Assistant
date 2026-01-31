@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from pi_sidecar.inference.engine import InferenceEngine
 from pi_sidecar.models.registry import ModelRegistry
+from pi_sidecar.training import TrainingService
 
 logger = logging.getLogger(__name__)
 
@@ -19,15 +20,18 @@ class RequestHandler:
         self,
         engine: InferenceEngine,
         registry: ModelRegistry,
+        training_service: TrainingService | None = None,
     ):
         """
         Initialize the request handler.
         Args:
             engine: The inference engine to use for text completion.
             registry: The model registry to use for model management.
+            training_service: Optional training service for training operations.
         """
         self.engine = engine
         self.registry = registry
+        self.training = training_service or TrainingService()
 
         self._handlers: dict[str, Callable] = {
             "health.ping": self._health_ping,
@@ -41,6 +45,11 @@ class RequestHandler:
             "personality.get_hatching": self._personality_get_hatching,
             "personality.get_prompt": self._personality_get_prompt,
             "personality.hatch_chat": self._personality_hatch_chat,
+            # Training handlers
+            "training.start": self._training_start,
+            "training.stop": self._training_stop,
+            "training.status": self._training_status,
+            "training.list": self._training_list,
         }
 
     async def dispatch(
@@ -213,3 +222,52 @@ class RequestHandler:
         )
         
         return {"text": result.get("text", "")}
+
+    # ── Training handlers ─────────────────────────────────────────
+
+    async def _training_start(self, params, _cb):
+        """
+        Start a new training run.
+        Args:
+            params: Training configuration dict.
+        Returns:
+            Dictionary with run_id.
+        """
+        run_id = await self.training.start(params)
+        return {"run_id": run_id, "status": "started"}
+
+    async def _training_stop(self, params, _cb):
+        """
+        Stop a running training job.
+        Args:
+            params: Dictionary with run_id.
+        Returns:
+            Dictionary with stop status.
+        """
+        run_id = params.get("run_id")
+        if not run_id:
+            raise ValueError("Missing run_id")
+        stopped = await self.training.stop(run_id)
+        return {"stopped": stopped, "run_id": run_id}
+
+    async def _training_status(self, params, _cb):
+        """
+        Get status of a training run.
+        Args:
+            params: Dictionary with run_id.
+        Returns:
+            Dictionary with run status and metrics.
+        """
+        run_id = params.get("run_id")
+        if not run_id:
+            raise ValueError("Missing run_id")
+        return await self.training.status(run_id)
+
+    async def _training_list(self, params, _cb):
+        """
+        List all training runs.
+        Returns:
+            Dictionary with list of runs.
+        """
+        runs = await self.training.list_runs()
+        return {"runs": runs}

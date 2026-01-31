@@ -1,7 +1,9 @@
-"""Training module for model fine-tuning with PyTorch Lightning."""
+"""
+Training Package.
 
-from .lightning_module import PiLightningModule
-from .data_module import PiDataModule
-from .trainer import TrainingOrchestrator
+Provides training pipeline integration for the sidecar.
+"""
 
-__all__ = ["PiLightningModule", "PiDataModule", "TrainingOrchestrator"]
+from .service import RunInfo, RunStatus, TrainingService
+
+__all__ = ["TrainingService", "RunStatus", "RunInfo"]

@@ -27,7 +27,9 @@ impl AppState {
 
         let memory = MemoryManager::new(None).expect("Failed to initialize memory");
 
-        let mut tool_registry = ToolRegistry::new();
+        let sidecar = Arc::new(Mutex::new(SidecarHandle::new()));
+
+        let mut tool_registry = ToolRegistry::new(sidecar.clone());
         if let Err(e) = tool_registry.load_mcp_tools().await {
             tracing::warn!("Failed to load MCP tools: {}", e);
         }
@@ -40,7 +42,7 @@ impl AppState {
             tool_registry: Arc::new(tool_registry),
             permissions: Arc::new(Mutex::new(PermissionEngine::new())),
             memory: Arc::new(memory),
-            sidecar: Arc::new(Mutex::new(SidecarHandle::new())),
+            sidecar,
         }
     }
 }
