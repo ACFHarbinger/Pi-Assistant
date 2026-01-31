@@ -13,6 +13,7 @@ repository = "https://github.com/pkhunter/Pi-Assistant"
 # Async runtime
 tokio = { version = "1.44", features = ["full"] }
 tokio-util = "0.7"
+tokio-cron-scheduler = "0.10"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

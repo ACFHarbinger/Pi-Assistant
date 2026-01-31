@@ -150,6 +150,7 @@ class RequestHandler:
             task=params["task"],
             iteration=params["iteration"],
             context=params.get("context", []),
+            tools=params.get("tools", []),
             provider=params.get("provider", "local"),
         )
 

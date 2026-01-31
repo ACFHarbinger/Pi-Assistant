@@ -1,6 +1,7 @@
 //! Application state management.
 
 use crate::channels::ChannelManager;
+use crate::cron::CronManager;
 use crate::ipc::SidecarHandle;
 use crate::memory::MemoryManager;
 use crate::safety::PermissionEngine;
@@ -20,6 +21,7 @@ pub struct AppState {
     pub memory: Arc<MemoryManager>,
     pub sidecar: Arc<Mutex<SidecarHandle>>,
     pub channel_manager: Arc<ChannelManager>,
+    pub cron_manager: Arc<CronManager>,
 }
 
 impl AppState {
@@ -27,11 +29,20 @@ impl AppState {
         let (agent_state_tx, agent_state_rx) = watch::channel(AgentState::Idle);
         let (agent_cmd_tx, agent_cmd_rx) = mpsc::channel(32);
 
+        let config_dir = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(".pi-assistant");
+
         let memory = MemoryManager::new(None).expect("Failed to initialize memory");
 
         let sidecar = Arc::new(Mutex::new(SidecarHandle::new()));
 
-        let mut tool_registry = ToolRegistry::new(sidecar.clone());
+        let cron_manager = CronManager::new(&config_dir, agent_cmd_tx.clone())
+            .await
+            .expect("Failed to initialize cron manager");
+        let cron_manager_arc = Arc::new(cron_manager);
+
+        let mut tool_registry = ToolRegistry::new(sidecar.clone(), cron_manager_arc.clone());
         if let Err(e) = tool_registry.load_mcp_tools().await {
             tracing::warn!("Failed to load MCP tools: {}", e);
         }
@@ -46,6 +57,7 @@ impl AppState {
             memory: Arc::new(memory),
             sidecar,
             channel_manager: Arc::new(ChannelManager::new()),
+            cron_manager: cron_manager_arc,
         }
     }
 }

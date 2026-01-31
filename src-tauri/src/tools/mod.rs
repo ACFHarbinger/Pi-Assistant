@@ -2,6 +2,7 @@
 
 pub mod browser;
 pub mod code;
+pub mod cron;
 pub mod shell;
 pub mod training;
 
@@ -89,7 +90,10 @@ pub struct ToolRegistry {
 
 impl ToolRegistry {
     /// Create a new registry with default tools.
-    pub fn new(sidecar: Arc<Mutex<crate::ipc::SidecarHandle>>) -> Self {
+    pub fn new(
+        sidecar: Arc<Mutex<crate::ipc::SidecarHandle>>,
+        cron_manager: Arc<crate::cron::CronManager>,
+    ) -> Self {
         let mut registry = Self {
             tools: HashMap::new(),
         };
@@ -98,6 +102,7 @@ impl ToolRegistry {
         registry.register(Arc::new(shell::ShellTool::new()));
         registry.register(Arc::new(code::CodeTool::new()));
         registry.register(Arc::new(training::TrainingTool::new(sidecar)));
+        registry.register(Arc::new(cron::CronTool::new(cron_manager)));
 
         registry
     }
@@ -202,7 +207,13 @@ mod tests {
     #[tokio::test]
     async fn test_registry_register_and_get() {
         let sidecar = Arc::new(Mutex::new(crate::ipc::SidecarHandle::new()));
-        let mut registry = ToolRegistry::new(sidecar);
+        let (tx, _) = tokio::sync::mpsc::channel(32);
+        let cron_manager = Arc::new(
+            crate::cron::CronManager::new(&std::env::temp_dir(), tx)
+                .await
+                .unwrap(),
+        );
+        let mut registry = ToolRegistry::new(sidecar, cron_manager);
         registry.register(Arc::new(MockTool));
         assert!(registry.get("mock").is_some());
         assert!(registry.get("nonexistent").is_none());
@@ -211,7 +222,13 @@ mod tests {
     #[tokio::test]
     async fn test_registry_execute() {
         let sidecar = Arc::new(Mutex::new(crate::ipc::SidecarHandle::new()));
-        let mut registry = ToolRegistry::new(sidecar);
+        let (tx, _) = tokio::sync::mpsc::channel(32);
+        let cron_manager = Arc::new(
+            crate::cron::CronManager::new(&std::env::temp_dir(), tx)
+                .await
+                .unwrap(),
+        );
+        let mut registry = ToolRegistry::new(sidecar, cron_manager);
         registry.register(Arc::new(MockTool));
 
         let call = ToolCall {
@@ -224,12 +241,19 @@ mod tests {
         assert_eq!(result.output, "mock executed");
     }
 
-    #[test]
-    fn test_default_tools_exist() {
+    #[tokio::test]
+    async fn test_default_tools_exist() {
         let sidecar = Arc::new(Mutex::new(crate::ipc::SidecarHandle::new()));
-        let registry = ToolRegistry::new(sidecar);
+        let (tx, _) = tokio::sync::mpsc::channel(32);
+        let cron_manager = Arc::new(
+            crate::cron::CronManager::new(&std::env::temp_dir(), tx)
+                .await
+                .unwrap(),
+        );
+        let registry = ToolRegistry::new(sidecar, cron_manager);
         assert!(registry.get("shell").is_some());
         assert!(registry.get("code").is_some());
         assert!(registry.get("train").is_some());
+        assert!(registry.get("cron").is_some());
     }
 }

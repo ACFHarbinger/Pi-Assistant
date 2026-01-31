@@ -155,6 +155,7 @@ class InferenceEngine:
         task: str,
         iteration: int,
         context: list[dict],
+        tools: list[dict] = [],
         provider: str = "local",
     ) -> dict[str, Any]:
         """
@@ -163,6 +164,7 @@ class InferenceEngine:
             task: The task to generate a plan for.
             iteration: The iteration number.
             context: The context to use for text completion.
+            tools: The list of available tools.
             provider: The provider to use for text completion.
         Returns:
             A dictionary containing the agent plan.
@@ -170,7 +172,11 @@ class InferenceEngine:
         # Get personality-aware base prompt
         personality = get_personality()
         personality_prompt = personality.system_prompt
-        
+
+        tools_list_str = "\n".join(
+            f"- {t.get('name')}: {t.get('description')}" for t in tools
+        )
+
         system_prompt = f"""{personality_prompt}
 
 # Agent Planner Instructions
@@ -188,7 +194,8 @@ Respond with JSON:
     "is_complete": false
 }}
 
-Available tools: shell, code, browser"""
+Available tools:
+{tools_list_str if tools_list_str else "shell, code, browser"}"""
 
         context_str = "\n".join(
             f"[{c.get('role', 'system')}]: {c.get('content', '')}" for c in context

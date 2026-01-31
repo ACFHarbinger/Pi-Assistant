@@ -176,6 +176,7 @@ async fn agent_loop(
                         "context": context,
                         "provider": task.provider,
                         "model_id": task.model_id,
+                        "tools": tool_registry.list_tools(),
                     }),
                 )
                 .await?;

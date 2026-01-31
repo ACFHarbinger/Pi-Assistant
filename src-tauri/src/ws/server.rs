@@ -7,13 +7,23 @@ use axum::{
         State,
     },
     response::IntoResponse,
-    routing::get,
-    Router,
+    routing::{get, post},
+    Json, Router,
 };
 use pi_core::agent_types::{AgentCommand, AgentState};
+use serde::Deserialize;
 use std::net::SocketAddr;
 use tokio::sync::{mpsc, watch};
 use tracing::{error, info};
+
+#[derive(Deserialize)]
+pub struct WebhookPayload {
+    pub task: String,
+    pub provider: Option<String>,
+    pub model_id: Option<String>,
+    #[serde(default)]
+    pub is_chat: bool,
+}
 
 /// WebSocket server state.
 pub struct WebSocketServer {
@@ -53,6 +63,7 @@ impl WebSocketServer {
         let app = Router::new()
             .route("/ws", get(ws_handler))
             .route("/health", get(health_handler))
+            .route("/webhook", post(webhook_handler))
             .with_state(state);
 
         let addr = SocketAddr::from(([0, 0, 0, 0], self.port));
@@ -87,4 +98,36 @@ async fn handle_socket(socket: WebSocket, state: WsState) {
     if let Err(e) = handler.run().await {
         error!(error = %e, "WebSocket handler error");
     }
+}
+
+/// Webhook handler to trigger agent commands via HTTP POST.
+async fn webhook_handler(
+    State(state): State<WsState>,
+    Json(payload): Json<WebhookPayload>,
+) -> impl IntoResponse {
+    let cmd = if payload.is_chat {
+        AgentCommand::ChatMessage {
+            content: payload.task,
+            provider: payload.provider,
+            model_id: payload.model_id,
+        }
+    } else {
+        AgentCommand::Start {
+            task: payload.task,
+            max_iterations: None,
+            provider: payload.provider,
+            model_id: payload.model_id,
+        }
+    };
+
+    if let Err(e) = state.agent_cmd_tx.send(cmd).await {
+        error!("Failed to send agent command from webhook: {}", e);
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to trigger agent",
+        )
+            .into_response();
+    }
+
+    (axum::http::StatusCode::OK, "Agent triggered").into_response()
 }

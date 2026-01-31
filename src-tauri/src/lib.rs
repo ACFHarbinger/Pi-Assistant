@@ -6,6 +6,7 @@ use tauri::Manager;
 pub mod agent;
 pub mod channels;
 pub mod commands;
+pub mod cron;
 pub mod ipc;
 pub mod mcp;
 pub mod memory;
@@ -61,6 +62,14 @@ pub fn run() {
                     }
                 });
 
+                // Start WebSocket/Webhook server
+                let ws_server = ws::WebSocketServer::new(
+                    8080,
+                    state.agent_state_rx.clone(),
+                    state.agent_cmd_tx.clone(),
+                );
+                ws_server.spawn();
+
                 app.manage(state);
             });
             tracing::info!("Application state and agent monitor initialized");
@@ -90,6 +99,9 @@ pub fn run() {
             commands::config::save_current_model,
             commands::config::get_telegram_config,
             commands::config::save_telegram_config,
+            commands::cron::get_cron_jobs,
+            commands::cron::add_cron_job,
+            commands::cron::remove_cron_job,
             commands::auth::start_oauth,
             commands::auth::exchange_oauth_code,
             commands::auth::start_claude_oauth,
