@@ -66,6 +66,17 @@ impl AppState {
             tracing::warn!("Failed to load MCP tools: {}", e);
         }
 
+        // Wrap registry in Arc<RwLock> early so TrainingTool can reference it
+        // for auto-registering deployed models.
+        let tool_registry = Arc::new(RwLock::new(tool_registry));
+        {
+            let training_tool = Arc::new(crate::tools::training::TrainingTool::new(
+                ml_sidecar.clone(),
+                tool_registry.clone(),
+            ));
+            tool_registry.write().await.register(training_tool);
+        }
+
         let mut voice_manager = crate::voice::VoiceManager::new(agent_cmd_tx.clone());
         let model_path = config_dir.join("voice").join("vosk-model-small-en-us-0.15");
         if let Err(e) = voice_manager.init_detector(model_path, 16000.0).await {
@@ -98,7 +109,7 @@ impl AppState {
             agent_state_rx,
             agent_cmd_tx: agent_cmd_tx.clone(),
             agent_cmd_rx: Arc::new(Mutex::new(agent_cmd_rx)),
-            tool_registry: Arc::new(RwLock::new(tool_registry)),
+            tool_registry,
             permissions: Arc::new(Mutex::new(PermissionEngine::new())),
             memory: Arc::new(memory),
             ml_sidecar,

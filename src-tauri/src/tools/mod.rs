@@ -95,7 +95,7 @@ pub struct ToolRegistry {
 impl ToolRegistry {
     /// Create a new registry with default tools.
     pub fn new(
-        ml_sidecar: Arc<Mutex<crate::ipc::SidecarHandle>>,
+        _ml_sidecar: Arc<Mutex<crate::ipc::SidecarHandle>>,
         _logic_sidecar: Arc<Mutex<crate::ipc::SidecarHandle>>,
         cron_manager: Arc<crate::cron::CronManager>,
     ) -> Self {
