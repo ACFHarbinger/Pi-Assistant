@@ -419,7 +419,6 @@ FodyWeavers.xsd
 
 # Build
 target/
-dist/
 
 # Virtual Environments
 .venv/

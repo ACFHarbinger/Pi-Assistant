@@ -188,6 +188,13 @@ async fn agent_loop(
         let tools = resources.tool_registry.read().await.list_tools();
         let plan = {
             let mut sidecar = resources.ml_sidecar.lock().await;
+
+            // Query device capabilities so the planner knows what hardware is available
+            let device_info = sidecar
+                .request("device.info", serde_json::json!({}))
+                .await
+                .ok();
+
             let response = sidecar
                 .request(
                     "inference.plan",
@@ -198,6 +205,7 @@ async fn agent_loop(
                         "provider": task.provider,
                         "model_id": task.model_id,
                         "tools": tools,
+                        "devices": device_info,
                     }),
                 )
                 .await?;
@@ -279,12 +287,17 @@ async fn agent_loop(
                 }
             }
 
-            let result = resources
+            // Clone the tool Arc and drop the read lock before executing.
+            // This prevents deadlock if a tool (e.g. TrainingTool.deploy)
+            // needs to write-lock the registry to register a new tool.
+            let tool = resources
                 .tool_registry
                 .read()
                 .await
-                .execute(tool_call)
-                .await?;
+                .get(&tool_call.tool_name)
+                .ok_or_else(|| anyhow::anyhow!("Unknown tool: {}", tool_call.tool_name))?
+                .clone();
+            let result = tool.execute(tool_call.parameters.clone()).await?;
             resources
                 .memory
                 .store_tool_result(&task.id, tool_call, &result)

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-shell";
 import { useAgentStore } from "../stores/agentStore";
+import { useClientAI } from "../hooks/useClientAI";
 
 export default function Settings({
   isOpen,
@@ -61,6 +62,21 @@ export default function Settings({
     enabled: false,
   });
   const [discordLoading, setDiscordLoading] = useState(false);
+
+  // Client AI Test
+  const { isLoaded: isClientAILoaded, predict: predictClientAI } =
+    useClientAI();
+  const [clientAIPrediction, setClientAIPrediction] = useState<string | null>(
+    null,
+  );
+
+  const handleTestClientAI = () => {
+    if (isClientAILoaded) {
+      const result = predictClientAI("Hello Client AI");
+      console.log("Prediction result:", result);
+      setClientAIPrediction(JSON.stringify(result));
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -535,6 +551,39 @@ export default function Settings({
 
           {activeTab === "models" && (
             <div className="space-y-6">
+              {/* Client AI Section */}
+              <div className="bg-zinc-100 dark:bg-zinc-800 p-4 rounded border border-zinc-200 dark:border-zinc-700">
+                <h3 className="font-bold dark:text-white mb-2">
+                  Client-Side AI (Wasm)
+                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-zinc-600 dark:text-zinc-400 text-sm">
+                    Status:
+                  </span>
+                  <span
+                    className={`text-sm font-medium ${isClientAILoaded ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"}`}
+                  >
+                    {isClientAILoaded
+                      ? "Loaded & Ready"
+                      : "Initializing / Not Loaded"}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTestClientAI}
+                    disabled={!isClientAILoaded}
+                    className="bg-purple-600 text-white px-3 py-1.5 rounded text-sm hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    Test Inference
+                  </button>
+                </div>
+                {clientAIPrediction && (
+                  <div className="mt-2 p-2 bg-zinc-200 dark:bg-zinc-900 rounded text-xs font-mono dark:text-gray-300 break-all">
+                    Result: {clientAIPrediction}
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-4">
                 {localModels.map((m: any) => (
                   <div

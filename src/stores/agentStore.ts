@@ -61,6 +61,13 @@ interface AgentStore {
   setModels: (models: { id: string; provider: string }[]) => void;
   setSelectedModel: (modelId: string | null) => Promise<void>;
   setSelectedProvider: (provider: string | null) => void;
+
+  // Client-Side AI
+  clientAI: {
+    isLoaded: boolean;
+    model: any;
+  };
+  setClientAIModel: (model: any) => void;
 }
 
 export const useAgentStore = create<AgentStore>((set, get) => {
@@ -73,6 +80,11 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     availableModels: [],
     selectedModel: null,
     selectedProvider: null,
+    clientAI: {
+      // Initialize clientAI
+      isLoaded: false,
+      model: null,
+    },
   };
 
   return {
@@ -307,5 +319,15 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       );
       return unlisten;
     },
+
+    // Client-Side AI
+    clientAI: {
+      isLoaded: false,
+      model: null as any, // Type will be handled in hook or refined later to avoid build issues if import fails
+    },
+    setClientAIModel: (model: any) =>
+      set((state) => ({
+        clientAI: { ...state.clientAI, isLoaded: true, model },
+      })),
   };
 });

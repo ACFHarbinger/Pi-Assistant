@@ -186,6 +186,9 @@ pub fn run() {
             commands::auth::check_provider_auth,
             commands::auth::disconnect_provider_auth,
             commands::sidecar::sidecar_request,
+            commands::device::get_device_info,
+            commands::device::refresh_device_memory,
+            commands::device::migrate_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

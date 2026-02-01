@@ -9,6 +9,7 @@ import { Canvas } from "./components/Canvas";
 
 import Settings from "./components/Settings";
 import { useState, useEffect } from "react";
+import { init_panic_hook } from "./wasm/pi-core";
 
 function App() {
   const { state, setupListeners } = useAgentStore();
@@ -16,8 +17,11 @@ function App() {
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [isHatched, setIsHatched] = useState<boolean | null>(null);
 
-  // Initialize listeners
+  // Initialize listeners and Wasm
   useEffect(() => {
+    init_panic_hook();
+    console.log("Wasm initialized");
+
     let unlisten: (() => void) | undefined;
     setupListeners().then((fn) => {
       unlisten = fn;

@@ -4,6 +4,7 @@ pub mod browser;
 pub mod canvas;
 pub mod code;
 pub mod cron;
+pub mod deployed_model;
 pub mod sessions;
 pub mod shell;
 pub mod training;
@@ -103,9 +104,10 @@ impl ToolRegistry {
         };
 
         // Register default tools
+        // NOTE: TrainingTool is registered separately in state.rs because it needs
+        // a reference to the Arc<RwLock<ToolRegistry>> for auto-registering deployed models.
         registry.register(Arc::new(shell::ShellTool::new()));
         registry.register(Arc::new(code::CodeTool::new()));
-        registry.register(Arc::new(training::TrainingTool::new(ml_sidecar)));
         registry.register(Arc::new(cron::CronTool::new(cron_manager)));
 
         registry
@@ -269,7 +271,7 @@ mod tests {
         let registry = ToolRegistry::new(ml_sidecar, logic_sidecar, cron_manager);
         assert!(registry.get("shell").is_some());
         assert!(registry.get("code").is_some());
-        assert!(registry.get("train").is_some());
+        // train tool is registered separately in state.rs (needs Arc<RwLock<ToolRegistry>> ref)
         assert!(registry.get("cron").is_some());
     }
 }

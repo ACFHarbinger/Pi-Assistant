@@ -5,8 +5,14 @@ edition.workspace = true
 license.workspace = true
 description = "Pi-Assistant core types and logic (no Tauri dependency)"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
-uuid.workspace = true
+uuid = { workspace = true, features = ["v4", "js"] }
 thiserror.workspace = true
+wasm-bindgen = "0.2"
+tsify = { version = "0.4.5", features = ["js"] }
+console_error_panic_hook = "0.1.7"

@@ -5,5 +5,6 @@ pub mod auth;
 pub mod chat;
 pub mod config;
 pub mod cron;
+pub mod device;
 pub mod sidecar;
 pub mod voice;

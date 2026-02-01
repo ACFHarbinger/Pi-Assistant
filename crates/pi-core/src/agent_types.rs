@@ -2,10 +2,13 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tsify::Tsify;
 use uuid::Uuid;
+use wasm_bindgen::prelude::*;
 
 /// Agent state machine.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 #[serde(tag = "status", content = "data")]
 pub enum AgentState {
     #[default]
@@ -31,7 +34,8 @@ pub enum AgentState {
 }
 
 /// Reason the agent stopped.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum StopReason {
     Completed,
     ManualStop,
@@ -40,7 +44,8 @@ pub enum StopReason {
 }
 
 /// Permission request from the agent.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct PermissionRequest {
     pub id: Uuid,
     pub tool_name: String,

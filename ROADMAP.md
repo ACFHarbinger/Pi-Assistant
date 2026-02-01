@@ -420,3 +420,326 @@ Keep multiple Python sidecar instances warm for parallel tool execution.
 - Affinity routing: send training tasks to GPU-equipped sidecars, inference to CPU sidecars
 - Health checking and automatic restart of unhealthy sidecars
 - Graceful scaling: spin up additional sidecars under load, wind down when idle
+
+---
+
+## 9. Compute Mobility & Device Management
+
+The agent should be able to treat compute hardware as a fluid resource — migrating itself, its models, and its workloads between CPU, GPU, and remote machines as conditions demand.
+
+### 9.1 GPU ↔ CPU Live Migration
+
+Allow the agent's inference engine and loaded models to transfer between GPU and CPU at runtime without restarting the sidecar or interrupting the agent loop.
+
+- **Device-aware model registry**: every loaded model tracks its current device (`cpu`, `cuda:0`, `cuda:1`, `mps`, etc.)
+- **On-demand migration**: the agent (or the user) issues a `model.to_device` command that calls `model.to(device)` in the Python sidecar, moving tensors and optimizer state between CPU and GPU memory
+- **Automatic fallback**: if GPU memory is exhausted during inference or training, the sidecar catches the `OutOfMemoryError`, migrates the model to CPU, retries the operation, and logs the fallback event
+- **Mixed-device operation**: keep the embedding model on CPU (small, fast enough) while a larger generative model occupies the GPU — the agent's device allocator decides placement based on model size, VRAM headroom, and current utilization
+- **Hot-swap during idle**: when the agent is idle and a training job finishes, automatically reclaim GPU memory by moving the inference model back from CPU to GPU
+- **UI indicator**: the resource monitor (5.2) shows a per-model device badge (CPU/GPU) and a one-click "Move to GPU" / "Move to CPU" button
+
+**Implementation sketch (Python sidecar):**
+```
+┌──────────────────────────────────────────────────────┐
+│  DeviceAllocator                                      │
+│                                                      │
+│  Models:                                             │
+│    embedding    → cpu    (384-dim, ~90 MB)           │
+│    planner_llm  → cuda:0 (7B params, ~14 GB)        │
+│    classifier_v2→ cpu    (fine-tuned, ~440 MB)       │
+│                                                      │
+│  VRAM budget:   24 GB total, 14.2 GB used            │
+│  RAM budget:    32 GB total, 4.1 GB used (models)    │
+│                                                      │
+│  migrate(model_name, target_device):                 │
+│    1. Acquire target device lock                     │
+│    2. Check available memory on target               │
+│    3. model.to(target_device)                        │
+│    4. Update registry                                │
+│    5. Emit device_changed event → UI + agent loop    │
+│    6. Release source device memory (gc + empty_cache)│
+└──────────────────────────────────────────────────────┘
+```
+
+### 9.2 Remote Compute Offloading
+
+The agent can dispatch heavy workloads (training, large-model inference, batch embedding) to a remote machine and continue light planning and tool execution locally. After the remote job completes, the agent pulls results back and resumes.
+
+- **Remote sidecar protocol**: extend the existing NDJSON IPC to work over SSH tunnels or a lightweight RPC layer (e.g., ZeroMQ, gRPC) to a remote Python sidecar running on a GPU server
+- **Job lifecycle**: `submit → running(progress%) → completed → pull_results` — the agent does not block; it continues other tool calls while the remote job runs
+- **Checkpoint streaming**: during remote training, stream checkpoints back to the local machine periodically so progress is not lost if the connection drops
+- **Automatic reconnect**: if the SSH tunnel or network connection drops, buffer pending IPC messages locally and replay them when the connection is restored
+- **Credential management**: SSH keys and remote host configs stored in the permission-gated keyring, never logged or embedded in memory
+- **Cost tracking**: log compute-hours consumed on remote machines, display in the cost dashboard (1.3)
+
+```
+Local Machine (CPU)                    Remote Machine (GPU)
+┌─────────────────────┐  SSH/gRPC     ┌──────────────────────┐
+│ Rust Agent Loop      │──────────────►│ Python Sidecar       │
+│  - planning (local)  │  submit job   │  - training          │
+│  - shell/code tools  │◄──────────────│  - large inference   │
+│  - memory queries    │  stream       │  - batch embedding   │
+│                      │  progress     │                      │
+│ Python Sidecar (CPU) │◄──────────────│  Return:             │
+│  - embeddings        │  pull model/  │  - trained model     │
+│  - light inference   │  results      │  - inference results │
+└─────────────────────┘               └──────────────────────┘
+```
+
+### 9.3 Multi-GPU Orchestration
+
+On machines with multiple GPUs, the agent should be able to distribute work across them intelligently.
+
+- **Per-GPU memory and utilization tracking** via `torch.cuda` and `nvidia-smi` polling
+- **Model sharding**: large models that don't fit on a single GPU are split across multiple GPUs using PyTorch's `device_map="auto"` or FSDP (Fully Sharded Data Parallel)
+- **Pipeline parallelism for training**: split model layers across GPUs so that forward and backward passes overlap, increasing throughput
+- **Data parallelism**: replicate the model on each GPU and split training batches across them using `DistributedDataParallel`
+- **GPU affinity rules**: user can pin specific models to specific GPUs (e.g., "always keep the planner on GPU 0, use GPU 1 for training")
+- **Dynamic rebalancing**: if one GPU becomes a bottleneck, migrate workloads to balance utilization
+
+### 9.4 Suspend, Serialize, and Resume Agent State
+
+The agent can snapshot its entire execution state — loaded models, memory context, plan progress, tool history — serialize it to disk, and resume later on the same or a different machine.
+
+- **State snapshot** includes: current plan, iteration counter, in-flight tool calls, loaded model weights and device placement, memory retrieval cache, permission state
+- **Portable format**: snapshot stored as a directory containing a metadata JSON file, model checkpoints (safetensors), and a SQLite memory export
+- **Cross-machine resume**: copy the snapshot to another machine (with compatible hardware), start Pi-Assistant, and issue a `resume_from_snapshot` command — the agent picks up exactly where it left off
+- **Use cases**: start a task on a laptop, suspend, transfer to a desktop with a GPU for training, transfer back to the laptop when training is done
+- **Integrity verification**: SHA-256 checksums on all snapshot artifacts to detect corruption during transfer
+
+### 9.5 Heterogeneous Device Awareness
+
+The agent should discover and adapt to whatever compute is available at runtime.
+
+- **Hardware probe at startup**: detect CPU architecture (x86_64, aarch64), GPU vendor and VRAM (NVIDIA/CUDA, AMD/ROCm, Apple/MPS), available RAM, disk speed
+- **Capability matrix**: map each detected device to the operations it can accelerate (CUDA → training + inference, MPS → inference only, CPU → everything but slower)
+- **Automatic model selection**: if only 4 GB of VRAM is available, select a quantized 4-bit model instead of a full-precision 7B model; if no GPU is present, default to CPU-optimized ONNX models
+- **Runtime adaptation**: if a USB eGPU is connected or disconnected during a session, detect the change and migrate models accordingly
+- **User override**: the user can force a specific device via settings even if the agent would prefer a different one
+
+---
+
+## 10. Advanced ML & Deep Learning
+
+### 10.1 Train-Deploy-Use Cycle
+
+A complete lifecycle where the agent trains a model, evaluates it, deploys it as a callable tool, and uses it in future tasks — all within the same session or across sessions.
+
+```
+User Request                Agent Actions
+────────────                ─────────────
+"Classify these             1. Inspect dataset (code tool)
+ support tickets            2. Select architecture (planner)
+ by priority"               3. Train classifier (training tool, GPU)
+        │                   4. Evaluate on held-out set
+        │                   5. Register as tool: classify_ticket(text) → priority
+        │                   6. Migrate model to CPU (free GPU for next task)
+        ▼                   7. Apply to remaining tickets using new tool
+"Here are 500               8. Return results to user
+ more tickets"              9. Use classify_ticket tool directly (no retraining)
+```
+
+- Trained models persist across sessions via the model registry
+- The agent can decide to retrain when it detects distribution shift (accuracy drop on new data)
+- Old model versions are kept for comparison; the agent can A/B test predictions
+
+### 10.2 Reinforcement Learning for Agent Self-Optimization
+
+Use RL (via TorchRL or Stable Baselines3) to train policies that improve the agent's own decision-making over time.
+
+- **Action space**: which tool to call, what parameters to use, when to ask the user vs. proceed autonomously
+- **Reward signal**: task completion (binary), number of iterations to complete (lower is better), user satisfaction (thumbs up/down), permission denials (penalty)
+- **Offline RL**: train on logged trajectories from past sessions without live exploration — safe, no risk of destructive actions during training
+- **Policy deployment**: the trained policy acts as an advisor to the LLM planner, biasing tool selection toward historically successful sequences
+- **Continuous improvement**: retrain the policy periodically as more session data accumulates
+- **Guardrails**: the RL policy can only suggest actions; the LLM planner and permission engine remain the final decision-makers
+
+### 10.3 Neural Architecture Search (NAS) for Task-Specific Models
+
+When the agent trains a task-specific model (10.1), it can use NAS to automatically discover the best architecture rather than relying on a fixed template.
+
+- Search space: layer count, hidden dimensions, activation functions, attention heads, dropout rates
+- Search strategy: Bayesian optimization (Optuna) or evolutionary search within a time/compute budget
+- Constraint-aware: the user specifies max model size, max inference latency, or target device — NAS respects these constraints
+- Results stored in the model registry with architecture metadata for reproducibility
+
+### 10.4 Continual & Incremental Learning
+
+Models trained by the agent should be updatable with new data without catastrophic forgetting.
+
+- **Elastic Weight Consolidation (EWC)**: penalize changes to weights that were important for previous tasks
+- **Replay buffer**: store a small subset of old training data and mix it into new training batches
+- **Adapter layers (LoRA/QLoRA)**: instead of full fine-tuning, train lightweight adapters that can be stacked — one per data batch or domain
+- **Forgetting detection**: after incremental training, evaluate on a held-out set from each previous data batch and alert if performance degrades
+
+### 10.5 Transfer Learning & Domain Adaptation
+
+The agent should be able to take a model trained on one task and adapt it for a related task with minimal data.
+
+- **Feature extraction**: freeze base model weights, train only a new classification head
+- **Gradual unfreezing**: unfreeze layers one at a time from the top, training briefly at each step
+- **Domain-adversarial training**: for cases where source and target domains differ significantly (e.g., formal text → colloquial text)
+- **Few-shot adaptation**: given only 5-20 labeled examples, fine-tune with aggressive regularization and data augmentation
+- **Zero-shot via prompting**: for generative models, the agent can attempt the task with prompt engineering before deciding whether fine-tuning is needed
+
+### 10.6 Distributed Training Across Machines
+
+Extend training beyond a single machine by coordinating multiple remote sidecars.
+
+- **Data-parallel training**: each machine holds a full model replica and processes a portion of the data; gradients are synchronized via `torch.distributed` (NCCL backend for GPU, Gloo for CPU)
+- **Launcher**: the agent provisions remote sidecars (9.2), distributes the dataset, and starts the distributed training job
+- **Fault tolerance**: if a node drops, the remaining nodes continue from the last checkpoint; the agent re-provisions the lost node and adds it back
+- **Monitoring**: the training dashboard (5.6) shows per-node metrics, communication overhead, and gradient synchronization times
+
+### 10.7 Model Interpretability & Explainability
+
+After training a model, the agent should be able to explain what the model learned and why it makes specific predictions.
+
+- **Feature importance**: SHAP values, integrated gradients, or attention weight visualization
+- **Confusion matrix and error analysis**: identify systematic misclassifications and suggest data improvements
+- **Counterfactual explanations**: "If the input had said X instead of Y, the prediction would change from A to B"
+- **Model cards**: the agent generates a markdown model card (stored in the knowledge base) documenting the model's purpose, training data, performance metrics, known limitations, and fairness considerations
+
+### 10.8 Synthetic Data Generation
+
+When real training data is scarce, the agent can generate synthetic data to augment it.
+
+- **Text augmentation**: paraphrasing, back-translation, entity substitution, synonym replacement
+- **LLM-generated examples**: use the planner LLM (or a dedicated generative model) to produce labeled examples matching the target distribution
+- **Tabular data synthesis**: SMOTE for class imbalance, Gaussian copulas for preserving statistical properties
+- **Quality filtering**: the agent evaluates generated samples against a discriminator or heuristic and discards low-quality ones before training
+- **Human-in-the-loop**: present borderline synthetic examples to the user for validation before including them in the training set
+
+---
+
+## 11. Autonomous Self-Improvement & Meta-Learning
+
+### 11.1 Tool Proficiency Tracking
+
+The agent maintains a profile of how effectively it uses each tool and improves weak areas.
+
+- **Success rate per tool**: percentage of tool calls that produced the expected result
+- **Common failure modes**: log recurring errors per tool (e.g., shell timeouts, permission denials, malformed browser selectors)
+- **Self-coaching**: before calling a tool the agent has historically struggled with, it retrieves past failures and their resolutions from memory to avoid repeating mistakes
+- **Skill decay detection**: if a tool's success rate drops (e.g., a website changed its DOM structure, breaking browser selectors), the agent flags it and attempts to re-learn the correct approach
+
+### 11.2 Meta-Learning Across Tasks
+
+Learn generalizable strategies from past tasks that transfer to new, unseen tasks.
+
+- **Task embeddings**: embed each completed task description and its successful tool trajectory into a shared space
+- **k-nearest task retrieval**: when a new task arrives, find the k most similar past tasks and use their trajectories as demonstrations for the planner
+- **Strategy distillation**: periodically distill successful patterns into a set of heuristic rules (stored as markdown in the knowledge base) that the planner consults
+- **Curriculum learning**: order tasks by difficulty based on historical iteration counts; use easier tasks to bootstrap strategies for harder ones
+
+### 11.3 Autonomous Skill Acquisition
+
+The agent can identify gaps in its capabilities and proactively acquire new skills.
+
+- **Gap detection**: if the agent repeatedly fails at a task type or frequently asks the user for help on the same topic, it logs a "skill gap"
+- **Self-study**: the agent uses the browser and RAG tools to research solutions — reading documentation, tutorials, and Stack Overflow — and stores findings in its knowledge base
+- **Practice runs**: the agent can create sandboxed practice tasks (in a container) to test new approaches without affecting the user's system
+- **Skill certification**: after practicing, the agent evaluates its performance on a held-out set of similar tasks; if it passes a threshold, it marks the skill as acquired
+
+### 11.4 Feedback-Driven Calibration
+
+Use explicit and implicit user feedback to calibrate the agent's confidence and behavior.
+
+- **Explicit feedback**: thumbs up/down on agent responses, tool results, and plan quality
+- **Implicit feedback**: user edits to agent-generated code (the diff is the feedback), user manually re-doing a step the agent already did (indicates the agent's version was wrong)
+- **Confidence calibration**: adjust the agent's willingness to act autonomously vs. ask the user based on historical accuracy — high accuracy on a task type → less asking; low accuracy → more asking
+- **Preference learning**: track which code styles, tool patterns, and communication styles the user prefers; encode these as soft constraints in the planner prompt
+
+---
+
+## 12. Multi-Modal Perception & Generation
+
+### 12.1 Vision Understanding
+
+The agent can process and reason about images, screenshots, and visual content.
+
+- **Screenshot analysis**: the agent takes a screenshot (via the browser tool or desktop capture) and uses a vision model to describe what it sees, identify UI elements, or detect errors
+- **Image-to-code**: given a mockup or wireframe image, the agent generates corresponding HTML/CSS/React code
+- **OCR**: extract text from images, PDFs, and scanned documents
+- **Visual diff**: compare two screenshots and describe what changed (useful for UI testing)
+- **Model support**: CLIP for image-text similarity, LLaVA or similar for visual question answering, running in the Python sidecar
+
+### 12.2 Audio Processing
+
+The agent can process and generate audio beyond simple speech recognition.
+
+- **Audio transcription**: Whisper-based transcription of audio files (meetings, lectures, podcasts) stored as searchable text in memory
+- **Speaker diarization**: identify who said what in multi-speaker audio
+- **Sound event detection**: classify audio events (alarm, doorbell, crash) for ambient monitoring use cases
+- **Text-to-speech generation**: generate audio files from text using a TTS model (Bark, VITS) for creating voice notes or accessibility features
+- **Music and audio analysis**: extract tempo, key, and structure from audio files for creative projects
+
+### 12.3 Document Understanding
+
+Deep processing of structured and semi-structured documents.
+
+- **PDF parsing**: extract text, tables, images, and form fields from PDFs using a combination of rule-based extraction and vision models
+- **Table extraction**: identify and extract tabular data from PDFs, images, and web pages into structured formats (CSV, JSON, dataframes)
+- **Chart reading**: given a chart image, extract the underlying data points
+- **Multi-page reasoning**: answer questions that require synthesizing information across multiple pages of a document
+- **Citation tracking**: when the agent references a document, link to the specific page and paragraph
+
+### 12.4 Code-Aware Vision
+
+Specialized visual understanding for software development contexts.
+
+- **UI component recognition**: identify buttons, forms, navigation elements, and layout patterns in screenshots
+- **Accessibility audit**: analyze screenshots for contrast ratios, missing labels, and touch target sizes
+- **Design system compliance**: compare a rendered UI against a design system specification and flag deviations
+- **Error screenshot diagnosis**: given a screenshot of an error state, correlate it with code and logs to diagnose the issue
+
+---
+
+## 13. Environment Awareness & Adaptation
+
+### 13.1 System Health Monitoring
+
+The agent continuously monitors the host system and adapts its behavior accordingly.
+
+- **Thermal awareness**: on laptops and SBCs (Raspberry Pi, Jetson), read thermal sensors and throttle agent activity (reduce batch sizes, pause training, migrate to CPU) before thermal throttling kicks in
+- **Battery awareness**: on battery-powered devices, reduce GPU usage and defer non-urgent tasks until plugged in
+- **Disk space monitoring**: before writing large files (model checkpoints, datasets), check available disk space and warn the user if space is low
+- **Memory pressure response**: if system RAM is under pressure, proactively unload idle models and reduce memory retrieval batch sizes
+
+### 13.2 Network-Aware Behavior
+
+Adapt to changing network conditions.
+
+- **Bandwidth detection**: measure available bandwidth before starting large transfers (model downloads, dataset uploads, remote sidecar communication)
+- **Offline mode**: if the network is unavailable, fall back to local-only models and tools; queue API calls and remote operations for when connectivity returns
+- **Metered connection awareness**: on mobile hotspots or metered connections, avoid large downloads and prefer local models
+- **Latency-adaptive provider selection**: if a cloud LLM provider is responding slowly, switch to a local model or a different provider
+
+### 13.3 Peripheral & Sensor Integration
+
+Interact with hardware peripherals and sensors connected to the host machine.
+
+- **Camera access**: capture photos or video via connected cameras for vision tasks (12.1)
+- **Microphone access**: continuous listening for wake word detection (4.3) and ambient sound monitoring (12.2)
+- **GPIO (on SBCs)**: read sensors and control actuators on Raspberry Pi or Jetson — temperature, humidity, relays, LEDs — enabling IoT and robotics use cases
+- **USB device detection**: when a new device is connected (e.g., a USB drive, Arduino, eGPU), the agent detects it and offers relevant actions ("I see you connected an Arduino. Want me to set up the development environment?")
+- **Bluetooth**: discover and interact with BLE devices for IoT monitoring and control
+
+### 13.4 Context-Aware Scheduling
+
+The agent decides when to perform tasks based on system and environmental context.
+
+- **Low-priority background tasks**: training jobs, re-indexing, and batch processing scheduled for when the user is idle (no keyboard/mouse input for N minutes)
+- **Power-aware scheduling**: defer GPU-heavy tasks until the device is plugged in
+- **Time-of-day preferences**: learn the user's work schedule and avoid notifications or heavy processing during off-hours
+- **Resource-aware queuing**: if a task requires more resources than currently available (e.g., GPU is occupied by training), queue it and start automatically when resources free up
+
+### 13.5 Edge Deployment & Embedded Targets
+
+Deploy trained models to resource-constrained edge devices.
+
+- **Model export**: convert trained PyTorch models to ONNX, TensorFlow Lite, or Core ML format for deployment on edge devices, mobile phones, or microcontrollers
+- **Quantization for edge**: apply post-training quantization (INT8, INT4) or quantization-aware training to minimize model size and inference latency on target hardware
+- **Benchmark on target**: if the target device is reachable (e.g., a Raspberry Pi on the local network), the agent can deploy the model, run inference benchmarks, and report latency and accuracy
+- **Over-the-air updates**: push updated models to deployed edge devices when retraining produces a better version
+- **Model pruning**: remove unnecessary parameters (structured or unstructured pruning) to meet memory and compute constraints of the target device
