@@ -120,21 +120,25 @@ impl SidecarHandle {
         let sidecar_src = sidecar_base.join("src");
         let shared_src = shared_base.join("src");
 
-        // Detect venv python (relative to sidecar_base)
+        // Detect venv python (relative to sidecar_base or workspace root)
         let venv_python = sidecar_base.join(".venv/bin/python");
+        let workspace_venv_python = sidecars_root
+            .parent()
+            .map(|p| p.join(".venv/bin/python"))
+            .unwrap_or_default();
+
         if venv_python.exists() {
-            info!("Using venv python: {:?}", venv_python);
+            info!("Using local venv python: {:?}", venv_python);
             self.python_path = venv_python.to_string_lossy().to_string();
+        } else if workspace_venv_python.exists() {
+            info!("Using workspace venv python: {:?}", workspace_venv_python);
+            self.python_path = workspace_venv_python.to_string_lossy().to_string();
         } else {
             info!("Using system python: {}", self.python_path);
         }
 
         // Combine PYTHONPATH
-        let python_path = format!(
-            "{}:{}",
-            sidecar_src.to_string_lossy(),
-            shared_src.to_string_lossy()
-        );
+        let python_path = sidecar_src.to_string_lossy().to_string();
 
         info!("Setting PYTHONPATH to: {}", python_path);
 
