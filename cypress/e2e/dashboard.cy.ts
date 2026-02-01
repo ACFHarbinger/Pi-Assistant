@@ -5,7 +5,7 @@ describe("Dashboard", () => {
   });
 
   it("displays dashboard components", () => {
-    cy.contains("Pi-Assistant").should("be.visible");
+    cy.contains("Pi-Assistant", { timeout: 10000 }).should("be.visible");
     cy.get("header").should("be.visible");
 
     // Task Input

@@ -35,16 +35,21 @@ Cypress.Commands.add("visitWithMock", (url: string) => {
 
       const mockTransformCallback = (callback: any) => callback;
 
+      // Mock the Tauri Core internals
       win.__TAURI_INTERNALS__ = {
         invoke: mockInvoke,
         transformCallback: mockTransformCallback,
         metadata: {},
-        plugins: {
-          event: {
-            unregisterListener: () => {},
-          },
+      };
+
+      // Mock the Event Plugin internals locally
+      win.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+        unregisterListener: (event: string, eventId: number) => {
+          // console.log("Mock unregister: ", event, eventId);
         },
       };
+
+      // Mock the global Tauri object
       win.__TAURI__ = {
         core: { invoke: mockInvoke },
         event: {
