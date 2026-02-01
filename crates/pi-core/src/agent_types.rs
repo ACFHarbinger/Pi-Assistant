@@ -1,5 +1,6 @@
 //! Agent types shared across the application.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tsify::Tsify;
@@ -16,6 +17,10 @@ pub enum AgentState {
     Running {
         task_id: Uuid,
         iteration: u32,
+        #[serde(default)]
+        task_tree: Vec<Subtask>,
+        #[serde(default)]
+        active_subtask_id: Option<Uuid>,
     },
     Paused {
         task_id: Uuid,
@@ -31,6 +36,29 @@ pub enum AgentState {
         #[serde(default)]
         is_streaming: bool,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct Subtask {
+    pub id: Uuid,
+    pub parent_id: Option<Uuid>,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: TaskStatus,
+    pub result: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub enum TaskStatus {
+    Pending,
+    Running,
+    Blocked,
+    Completed,
+    Failed,
 }
 
 /// Reason the agent stopped.

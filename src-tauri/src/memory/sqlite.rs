@@ -95,6 +95,20 @@ impl MemoryManager {
                 FOREIGN KEY (task_id) REFERENCES tasks(id)
             );
 
+            -- Subtasks
+            CREATE TABLE IF NOT EXISTS subtasks (
+                id TEXT PRIMARY KEY,
+                root_task_id TEXT NOT NULL,
+                parent_id TEXT,
+                title TEXT NOT NULL,
+                description TEXT,
+                status TEXT NOT NULL,
+                result TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(root_task_id) REFERENCES tasks(id)
+            );
+
             -- Permission cache
             CREATE TABLE IF NOT EXISTS permission_cache (
                 pattern TEXT PRIMARY KEY,
@@ -106,6 +120,7 @@ impl MemoryManager {
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
             CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id);
             CREATE INDEX IF NOT EXISTS idx_tool_executions_task ON tool_executions(task_id);
+            CREATE INDEX IF NOT EXISTS idx_subtasks_root ON subtasks(root_task_id);
         "#,
         )?;
 
@@ -158,6 +173,35 @@ impl MemoryManager {
 
         debug!(task_id = %id, "Created task");
         Ok(id)
+    }
+
+    /// Store or update subtasks.
+    pub async fn store_subtasks(
+        &self,
+        task_id: &Uuid,
+        subtasks: &[pi_core::agent_types::Subtask],
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        for subtask in subtasks {
+            conn.execute(
+                "INSERT OR REPLACE INTO subtasks (id, root_task_id, parent_id, title, description, status, result, created_at, updated_at) 
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    subtask.id.to_string(),
+                    task_id.to_string(),
+                    subtask.parent_id.map(|id| id.to_string()),
+                    subtask.title,
+                    subtask.description,
+                    format!("{:?}", subtask.status).to_lowercase(),
+                    subtask.result,
+                    subtask.created_at.to_rfc3339(),
+                    subtask.updated_at.to_rfc3339(),
+                ],
+            )?;
+        }
+
+        Ok(())
     }
 
     /// Update task status.

@@ -2,6 +2,17 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 
+interface Subtask {
+  id: string;
+  parent_id: string | null;
+  title: string;
+  description: string | null;
+  status: "pending" | "running" | "completed" | "failed" | "blocked";
+  result: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface PermissionRequest {
   id: string;
   tool_name: string;
@@ -15,6 +26,8 @@ interface AgentState {
   data?: {
     task_id?: string;
     iteration?: number;
+    task_tree?: Subtask[];
+    active_subtask_id?: string | null;
     question?: string;
     reason?: string;
     awaiting_permission?: PermissionRequest;

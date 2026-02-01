@@ -5,6 +5,7 @@ use crate::memory::MemoryManager;
 use crate::safety::{PermissionEngine, PermissionResult};
 use crate::tools::{ToolCall, ToolRegistry};
 use pi_core::agent_types::{AgentCommand, AgentState, PermissionRequest, StopReason};
+use pi_core::task_manager::TaskManager;
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -103,6 +104,7 @@ async fn agent_loop(
     info!(task_id = %task.id, "Agent loop started: {}", task.description);
 
     let mut iteration: u32 = 0;
+    let mut task_manager = TaskManager::new();
 
     loop {
         // ── Check cancellation ───────────────────────────────────────
@@ -127,6 +129,8 @@ async fn agent_loop(
         let _ = state_tx.send(AgentState::Running {
             task_id: task.id,
             iteration,
+            task_tree: task_manager.get_tree(),
+            active_subtask_id: task_manager.get_active_subtask(),
         });
 
         // ── Check for incoming commands (non-blocking) ───────────────
@@ -165,6 +169,8 @@ async fn agent_loop(
                     let _ = state_tx.send(AgentState::Running {
                         task_id: task.id,
                         iteration,
+                        task_tree: task_manager.get_tree(),
+                        active_subtask_id: task_manager.get_active_subtask(),
                     });
                 }
                 AgentCommand::ChannelMessage { text, .. } => {
@@ -202,6 +208,8 @@ async fn agent_loop(
                         "task": task.description,
                         "iteration": iteration,
                         "context": context,
+                        "task_tree": task_manager.get_tree(),
+                        "active_subtask_id": task_manager.get_active_subtask(),
                         "provider": task.provider,
                         "model_id": task.model_id,
                         "tools": tools,
@@ -236,6 +244,8 @@ async fn agent_loop(
             let _ = state_tx.send(AgentState::Running {
                 task_id: task.id,
                 iteration,
+                task_tree: task_manager.get_tree(),
+                active_subtask_id: task_manager.get_active_subtask(),
             });
         }
 
@@ -274,6 +284,8 @@ async fn agent_loop(
                     let _ = state_tx.send(AgentState::Running {
                         task_id: task.id,
                         iteration,
+                        task_tree: task_manager.get_tree(),
+                        active_subtask_id: task_manager.get_active_subtask(),
                     });
 
                     if !approved {
@@ -285,6 +297,65 @@ async fn agent_loop(
                     warn!(tool = %tool_call.tool_name, %reason, "Permission denied by rule");
                     continue;
                 }
+            }
+
+            // ── Handle internal subtask management ───────────────────
+            if tool_call.tool_name == "manage_subtasks" {
+                let action = tool_call.parameters.get("action").and_then(|v| v.as_str());
+                match action {
+                    Some("create") => {
+                        if let Some(subtasks) = tool_call
+                            .parameters
+                            .get("subtasks")
+                            .and_then(|v| v.as_array())
+                        {
+                            for st in subtasks {
+                                let title = st
+                                    .get("title")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("Untitled")
+                                    .to_string();
+                                let desc = st
+                                    .get("description")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string());
+                                let parent_id = st
+                                    .get("parent_id")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| Uuid::parse_str(s).ok());
+                                task_manager.add_subtask(title, desc, parent_id);
+                            }
+                        }
+                    }
+                    Some("update") => {
+                        let id_str = tool_call
+                            .parameters
+                            .get("subtask_id")
+                            .and_then(|v| v.as_str());
+                        let status_str =
+                            tool_call.parameters.get("status").and_then(|v| v.as_str());
+                        if let (Some(id_s), Some(status_s)) = (id_str, status_str) {
+                            if let Ok(id) = Uuid::parse_str(id_s) {
+                                let status = match status_s {
+                                    "running" => pi_core::agent_types::TaskStatus::Running,
+                                    "completed" => pi_core::agent_types::TaskStatus::Completed,
+                                    "failed" => pi_core::agent_types::TaskStatus::Failed,
+                                    "blocked" => pi_core::agent_types::TaskStatus::Blocked,
+                                    _ => pi_core::agent_types::TaskStatus::Pending,
+                                };
+                                task_manager.update_status(id, status);
+                            }
+                        }
+                    }
+                    _ => warn!("Unknown subtask management action: {:?}", action),
+                }
+
+                // Persist updated tree
+                let _ = resources
+                    .memory
+                    .store_subtasks(&task.id, &task_manager.get_tree())
+                    .await;
+                continue;
             }
 
             // Clone the tool Arc and drop the read lock before executing.

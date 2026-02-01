@@ -2,6 +2,9 @@
 
 pub mod agent_types;
 pub mod protocol;
+pub mod task_manager;
+
+use wasm_bindgen::prelude::*;
 
 use wasm_bindgen::prelude::*;
 

@@ -6,10 +6,11 @@ import { PermissionDialog } from "./components/PermissionDialog.tsx";
 import { HatchingExperience } from "./components/HatchingExperience.tsx";
 import { VoicePanel } from "./components/VoicePanel";
 import { Canvas } from "./components/Canvas";
+import { TaskTree } from "./components/TaskTree";
 
 import Settings from "./components/Settings";
 import { useState, useEffect } from "react";
-import { init_panic_hook } from "./wasm/pi-core";
+import init, { init_panic_hook } from "./wasm/pi-core/pi_core";
 
 function App() {
   const { state, setupListeners } = useAgentStore();
@@ -19,8 +20,16 @@ function App() {
 
   // Initialize listeners and Wasm
   useEffect(() => {
-    init_panic_hook();
-    console.log("Wasm initialized");
+    const initWasm = async () => {
+      try {
+        await init();
+        init_panic_hook();
+        console.log("Core Wasm initialized");
+      } catch (e) {
+        console.error("Failed to initialize Core Wasm:", e);
+      }
+    };
+    initWasm();
 
     let unlisten: (() => void) | undefined;
     setupListeners().then((fn) => {
@@ -113,6 +122,17 @@ function App() {
                     <span className="font-mono">
                       {(state as any).data.iteration}
                     </span>
+                  </div>
+                )}
+                {state.data?.task_tree && state.data.task_tree.length > 0 && (
+                  <div className="pt-4 border-t border-white/5">
+                    <h3 className="text-sm font-medium mb-3 text-slate-300">
+                      Strategy & Subtasks
+                    </h3>
+                    <TaskTree
+                      subtasks={state.data.task_tree}
+                      activeSubtaskId={state.data.active_subtask_id}
+                    />
                   </div>
                 )}
               </div>

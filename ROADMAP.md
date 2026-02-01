@@ -6,14 +6,10 @@ This roadmap outlines planned features and enhancements across the Pi-Assistant 
 
 ## 1. Agent Intelligence & Planning
 
-### 1.1 Hierarchical Task Decomposition
-
-The current single-pass planner produces a flat list of tool calls per iteration. Introduce a hierarchical planner that breaks complex tasks into subtask trees, where each subtask can itself be planned and executed independently. This enables the agent to tackle multi-step projects (e.g., "build a REST API with tests and documentation") without losing coherence across iterations.
-
-- Subtask graph stored in memory with parent/child relationships
-- Each subtask tracks its own state (pending, running, blocked, done)
-- Planner can delegate subtasks to specialized sub-agents from the agent pool
-- UI renders the task tree with collapsible nodes and progress indicators
+- [x] **1.1 Hierarchical Task Decomposition** [IMPLEMENTED]
+  - Introduced a hierarchical planner that breaks complex tasks into subtask trees.
+  - Subtask state management (Pending, Running, Blocked, Done) and persistence.
+  - TaskTree visualizer in the UI with progress indicators.
 
 ### 1.2 Reflection & Self-Correction Loop
 
@@ -48,6 +44,7 @@ Extend the existing agent pool to support concurrent agents working on related s
 Expand the existing PyTorch Lightning training tool into a full workflow for training, evaluating, and deploying task-specific models that the agent can then use as specialized tools.
 
 **Training Pipeline:**
+
 - User provides a dataset (CSV, JSON, or a directory of files) and describes the task
 - Agent selects an appropriate base model architecture (classification, sequence-to-sequence, regression, NER, etc.)
 - Agent configures hyperparameters based on dataset size and task type
@@ -55,6 +52,7 @@ Expand the existing PyTorch Lightning training tool into a full workflow for tra
 - Checkpoints are saved to the model registry with metadata (task, accuracy, training config)
 
 **Supported Task Types:**
+
 - Text classification (sentiment, intent, topic)
 - Named entity recognition
 - Text summarization / paraphrasing
@@ -63,6 +61,7 @@ Expand the existing PyTorch Lightning training tool into a full workflow for tra
 - Time-series forecasting
 
 **Agent Integration:**
+
 - Trained models register as new tools in the `ToolRegistry` automatically
 - The planner can invoke trained models by name (e.g., `classify_support_ticket`, `predict_sales`)
 - Model versioning: the agent can retrain and compare metrics across versions
@@ -421,24 +420,34 @@ Keep multiple Python sidecar instances warm for parallel tool execution.
 - Health checking and automatic restart of unhealthy sidecars
 - Graceful scaling: spin up additional sidecars under load, wind down when idle
 
+### 8.5 Client-Side WebAssembly Inference [IMPLEMENTED]
+
+Enable the agent to execute light-weight models directly in the web browser using the Candle framework compiled to WebAssembly.
+
+- **pi-ai crate**: Native Rust AI logic compiled to Wasm.
+- **In-browser execution**: Zero-latency inference for small models (embeddings, lightweight classifiers).
+- **Zustand integration**: Model state managed via `agentStore.ts`.
+- **useClientAI Hook**: Unified interface for initializing and calling the Wasm model.
+
 ---
 
-## 9. Compute Mobility & Device Management
+## 9. Compute Mobility & Device Management (Phase 1 partially complete)
 
 The agent should be able to treat compute hardware as a fluid resource — migrating itself, its models, and its workloads between CPU, GPU, and remote machines as conditions demand.
 
-### 9.1 GPU ↔ CPU Live Migration
+### 9.1 GPU ↔ CPU Live Migration [IMPLEMENTED]
 
 Allow the agent's inference engine and loaded models to transfer between GPU and CPU at runtime without restarting the sidecar or interrupting the agent loop.
 
-- **Device-aware model registry**: every loaded model tracks its current device (`cpu`, `cuda:0`, `cuda:1`, `mps`, etc.)
-- **On-demand migration**: the agent (or the user) issues a `model.to_device` command that calls `model.to(device)` in the Python sidecar, moving tensors and optimizer state between CPU and GPU memory
-- **Automatic fallback**: if GPU memory is exhausted during inference or training, the sidecar catches the `OutOfMemoryError`, migrates the model to CPU, retries the operation, and logs the fallback event
-- **Mixed-device operation**: keep the embedding model on CPU (small, fast enough) while a larger generative model occupies the GPU — the agent's device allocator decides placement based on model size, VRAM headroom, and current utilization
+- **Device-aware model registry**: every loaded model tracks its current device (`cpu`, `cuda:0`, `cuda:1`, `mps`, etc.) — _Implemented in `LoadedModel.device` field and `ModelRegistry.list_models()` device info_
+- **On-demand migration**: the agent (or the user) issues a `model.to_device` command that calls `model.to(device)` in the Python sidecar, moving tensors and optimizer state between CPU and GPU memory — _Implemented via `ModelRegistry.migrate_model()`, `model.migrate` IPC handler, and `migrate_model` Tauri command_
+- **Automatic fallback**: if GPU memory is exhausted during inference or training, the sidecar catches the `OutOfMemoryError`, migrates the model to CPU, retries the operation, and logs the fallback event — _Implemented in `InferenceEngine._complete_local_stream()` OOM catch-and-retry wrapper_
+- **Mixed-device operation**: keep the embedding model on CPU (small, fast enough) while a larger generative model occupies the GPU — the agent's device allocator decides placement based on model size, VRAM headroom, and current utilization — _Implemented via `DeviceManager.best_device_for()` placement logic_
 - **Hot-swap during idle**: when the agent is idle and a training job finishes, automatically reclaim GPU memory by moving the inference model back from CPU to GPU
-- **UI indicator**: the resource monitor (5.2) shows a per-model device badge (CPU/GPU) and a one-click "Move to GPU" / "Move to CPU" button
+- **UI indicator**: the resource monitor (5.2) shows a per-model device badge (CPU/GPU) and a one-click "Move to GPU" / "Move to CPU" button — _Frontend store implemented in `deviceStore.ts` with `migrateModel()` action_
 
 **Implementation sketch (Python sidecar):**
+
 ```
 ┌──────────────────────────────────────────────────────┐
 │  DeviceAllocator                                      │
@@ -507,21 +516,21 @@ The agent can snapshot its entire execution state — loaded models, memory cont
 - **Use cases**: start a task on a laptop, suspend, transfer to a desktop with a GPU for training, transfer back to the laptop when training is done
 - **Integrity verification**: SHA-256 checksums on all snapshot artifacts to detect corruption during transfer
 
-### 9.5 Heterogeneous Device Awareness
+### 9.5 Heterogeneous Device Awareness [IMPLEMENTED]
 
 The agent should discover and adapt to whatever compute is available at runtime.
 
-- **Hardware probe at startup**: detect CPU architecture (x86_64, aarch64), GPU vendor and VRAM (NVIDIA/CUDA, AMD/ROCm, Apple/MPS), available RAM, disk speed
-- **Capability matrix**: map each detected device to the operations it can accelerate (CUDA → training + inference, MPS → inference only, CPU → everything but slower)
-- **Automatic model selection**: if only 4 GB of VRAM is available, select a quantized 4-bit model instead of a full-precision 7B model; if no GPU is present, default to CPU-optimized ONNX models
+- **Hardware probe at startup**: detect CPU architecture (x86*64, aarch64), GPU vendor and VRAM (NVIDIA/CUDA, AMD/ROCm, Apple/MPS), available RAM, disk speed — \_Implemented in `DeviceManager.probe()` with `GpuInfo`, `CpuInfo`, `SystemInfo` dataclasses*
+- **Capability matrix**: map each detected device to the operations it can accelerate (CUDA → training + inference, MPS → inference only, CPU → everything but slower) — _Implemented in `DeviceManager.get_capabilities()` returning `DeviceCapability` per device_
+- **Automatic model selection**: if only 4 GB of VRAM is available, select a quantized 4-bit model instead of a full-precision 7B model; if no GPU is present, default to CPU-optimized ONNX models — _Partially implemented: `best_device_for()` chooses placement; model format selection not yet automated_
 - **Runtime adaptation**: if a USB eGPU is connected or disconnected during a session, detect the change and migrate models accordingly
-- **User override**: the user can force a specific device via settings even if the agent would prefer a different one
+- **User override**: the user can force a specific device via settings even if the agent would prefer a different one — _Implemented via `migrate_model` Tauri command and frontend `deviceStore.migrateModel()` action_
 
 ---
 
-## 10. Advanced ML & Deep Learning
+## 10. Advanced ML & Deep Learning (Phase 1 partially complete)
 
-### 10.1 Train-Deploy-Use Cycle
+### 10.1 Train-Deploy-Use Cycle [IMPLEMENTED]
 
 A complete lifecycle where the agent trains a model, evaluates it, deploys it as a callable tool, and uses it in future tasks — all within the same session or across sessions.
 
@@ -539,9 +548,17 @@ User Request                Agent Actions
  more tickets"              9. Use classify_ticket tool directly (no retraining)
 ```
 
-- Trained models persist across sessions via the model registry
+- Trained models persist across sessions via the model registry — _Implemented: `TrainingService.deploy()` loads checkpoint, registers in `ModelRegistry`; `RunInfo` tracks deployment metadata persisted to `runs.json`_
 - The agent can decide to retrain when it detects distribution shift (accuracy drop on new data)
 - Old model versions are kept for comparison; the agent can A/B test predictions
+
+**Implementation details:**
+
+- `TrainingService.deploy(run_id, tool_name, device)` rebuilds model from config, loads weights, registers as `LoadedModel`
+- `TrainingService.predict(tool_name, input_data)` runs inference with task-type-aware post-processing (classification → softmax, regression → raw output)
+- `DeployedModelTool` (Rust) wraps each deployed model as a callable `Tool` in the `ToolRegistry`
+- `TrainingTool` extended with `deploy`, `predict`, `list_deployed` actions; auto-registers `DeployedModelTool` on deploy
+- Deadlock prevention: tool `Arc` cloned before execution in agent loop; sidecar lock dropped before registry write-lock acquired during deploy
 
 ### 10.2 Reinforcement Learning for Agent Self-Optimization
 
