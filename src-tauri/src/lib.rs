@@ -144,6 +144,7 @@ pub fn run() {
             commands::agent::stop_agent,
             commands::agent::pause_agent,
             commands::agent::resume_agent,
+            commands::agent::answer_question,
             commands::agent::get_agent_state,
             commands::chat::send_message,
             commands::chat::get_history,

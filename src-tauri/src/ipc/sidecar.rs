@@ -52,6 +52,7 @@ pub struct SidecarHandle {
     child: Option<Child>,
     stdin: Option<ChildStdin>,
     pending: Arc<Mutex<HashMap<String, oneshot::Sender<Result<serde_json::Value>>>>>,
+    pending_progress: Arc<Mutex<HashMap<String, mpsc::Sender<serde_json::Value>>>>,
     progress_tx: mpsc::Sender<ProgressUpdate>,
     progress_rx: Option<mpsc::Receiver<ProgressUpdate>>,
     python_path: String,
@@ -67,6 +68,7 @@ impl SidecarHandle {
             child: None,
             stdin: None,
             pending: Arc::new(Mutex::new(HashMap::new())),
+            pending_progress: Arc::new(Mutex::new(HashMap::new())),
             progress_tx,
             progress_rx: Some(progress_rx),
             python_path: "python3".to_string(),
@@ -206,6 +208,7 @@ impl SidecarHandle {
 
         // Spawn stdout reader task
         let pending = self.pending.clone();
+        let pending_progress = self.pending_progress.clone();
         let progress_tx = self.progress_tx.clone();
 
         tokio::spawn(async move {
@@ -222,9 +225,17 @@ impl SidecarHandle {
                             let _ = progress_tx
                                 .send(ProgressUpdate {
                                     request_id: response.id.clone(),
-                                    data: progress,
+                                    data: progress.clone(),
                                 })
                                 .await;
+
+                            // Also send to request-specific listener if any
+                            let mut pending_p = pending_progress.lock().await;
+                            if let Some(tx) = pending_p.get(&response.id) {
+                                if let Err(_) = tx.send(progress).await {
+                                    pending_p.remove(&response.id);
+                                }
+                            }
                         } else {
                             // Final response
                             let mut pending = pending.lock().await;
@@ -236,6 +247,8 @@ impl SidecarHandle {
                                 };
                                 let _ = tx.send(result);
                             }
+                            // Clean up progress listener
+                            pending_progress.lock().await.remove(&response.id);
                         }
                     }
                     Err(e) => {
@@ -294,6 +307,16 @@ impl SidecarHandle {
         method: &str,
         params: serde_json::Value,
     ) -> Result<serde_json::Value> {
+        self.request_with_progress(method, params, None).await
+    }
+
+    /// Send a request and also receive progress updates.
+    pub async fn request_with_progress(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+        progress_tx: Option<mpsc::Sender<serde_json::Value>>,
+    ) -> Result<serde_json::Value> {
         // 1. Ensure sidecar is healthy before sending
         if !self.is_alive() {
             warn!("Sidecar is dead or not started, attempting to start...");
@@ -303,7 +326,10 @@ impl SidecarHandle {
         }
 
         // 2. Try raw request first
-        match self.send_raw_request(method, params.clone()).await {
+        match self
+            .send_raw_request_internal(method, params.clone(), progress_tx.clone())
+            .await
+        {
             Ok(res) => Ok(res),
             Err(e) => {
                 warn!(error = %e, "Request failed, triggering restart...");
@@ -312,7 +338,8 @@ impl SidecarHandle {
                 self.start().await?;
 
                 // Retry once
-                self.send_raw_request(method, params).await
+                self.send_raw_request_internal(method, params, progress_tx)
+                    .await
             }
         }
     }
@@ -323,10 +350,22 @@ impl SidecarHandle {
         method: &str,
         params: serde_json::Value,
     ) -> Result<serde_json::Value> {
+        self.send_raw_request_internal(method, params, None).await
+    }
+
+    async fn send_raw_request_internal(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+        progress_tx: Option<mpsc::Sender<serde_json::Value>>,
+    ) -> Result<serde_json::Value> {
         let id = Uuid::new_v4().to_string();
         let (tx, rx) = oneshot::channel();
 
         self.pending.lock().await.insert(id.clone(), tx);
+        if let Some(ptx) = progress_tx {
+            self.pending_progress.lock().await.insert(id.clone(), ptx);
+        }
 
         let request = IpcRequest {
             id: id.clone(),

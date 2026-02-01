@@ -12,6 +12,7 @@ export function ChatInterface() {
     fetchModels,
     setSelectedModel,
     setSelectedProvider,
+    sendAnswer,
   } = useAgentStore();
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -49,7 +50,13 @@ export function ChatInterface() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-    sendMessage(input.trim());
+
+    if (isWaitingForInput) {
+      sendAnswer(input.trim());
+    } else {
+      sendMessage(input.trim());
+    }
+
     setInput("");
   };
 
@@ -113,7 +120,7 @@ export function ChatInterface() {
             </div>
           </div>
         ) : (
-          messages.map((msg) => (
+          messages.map((msg, index) => (
             <div
               key={msg.id}
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -127,7 +134,32 @@ export function ChatInterface() {
                       : "bg-gray-800 text-gray-100"
                 }`}
               >
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                <div className="whitespace-pre-wrap">
+                  {msg.content === "" &&
+                  msg.role === "assistant" &&
+                  index === messages.length - 1 &&
+                  state.status === "AssistantMessage" &&
+                  state.data?.is_streaming ? (
+                    <div className="flex items-center gap-2 text-primary-400 font-medium text-xs">
+                      <span className="thinking-spinner" />
+                      Thinking...
+                    </div>
+                  ) : (
+                    <>
+                      {msg.content}
+                      {msg.role === "assistant" &&
+                        index === messages.length - 1 &&
+                        state.status === "AssistantMessage" &&
+                        state.data?.is_streaming && (
+                          <span className="inline-flex gap-1 ml-2 align-middle">
+                            <span className="typing-dot animate-pulse" />
+                            <span className="typing-dot animate-pulse" />
+                            <span className="typing-dot animate-pulse" />
+                          </span>
+                        )}
+                    </>
+                  )}
+                </div>
                 <p className="text-xs opacity-50 mt-1">
                   {msg.timestamp.toLocaleTimeString()}
                 </p>

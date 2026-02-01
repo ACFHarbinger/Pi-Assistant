@@ -19,6 +19,7 @@ interface AgentState {
     reason?: string;
     awaiting_permission?: PermissionRequest;
     content?: string;
+    is_streaming?: boolean;
   };
 }
 
@@ -46,6 +47,7 @@ interface AgentStore {
   pauseAgent: () => Promise<void>;
   resumeAgent: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
+  sendAnswer: (content: string) => Promise<void>;
   refreshState: () => Promise<void>;
   addMessage: (role: Message["role"], content: string) => void;
   clearError: () => void;
@@ -135,7 +137,20 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         await invoke("send_message", {
           message: content,
           provider: selectedProvider || null,
-          modelId: selectedModel || null,
+          model_id: selectedModel || null,
+        });
+      } catch (e) {
+        set({ error: String(e) });
+      }
+    },
+
+    sendAnswer: async (content: string) => {
+      // Optimistic update
+      get().addMessage("user", content);
+
+      try {
+        await invoke("answer_question", {
+          answer: content,
         });
       } catch (e) {
         set({ error: String(e) });
@@ -265,8 +280,24 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
           if (newState.status === "AssistantMessage") {
             const content = newState.data?.content;
+            const isStreaming = newState.data?.is_streaming;
+
             if (content) {
-              get().addMessage("assistant", content);
+              const { messages } = get();
+              const lastMessage = messages[messages.length - 1];
+
+              if (isStreaming && lastMessage?.role === "assistant") {
+                // Update existing streaming message
+                const updatedMessages = [...messages];
+                updatedMessages[updatedMessages.length - 1] = {
+                  ...lastMessage,
+                  content: content,
+                };
+                set({ messages: updatedMessages });
+              } else {
+                // New message or final transition
+                get().addMessage("assistant", content);
+              }
             }
             return;
           }

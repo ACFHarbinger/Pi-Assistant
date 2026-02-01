@@ -25,6 +25,8 @@ pub enum AgentState {
     },
     AssistantMessage {
         content: String,
+        #[serde(default)]
+        is_streaming: bool,
     },
 }
 

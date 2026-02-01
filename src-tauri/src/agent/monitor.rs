@@ -27,7 +27,7 @@ pub async fn spawn_agent_monitor(
     let mut current_loop: Option<AgentLoopHandle> = None;
 
     loop {
-        let cmd = {
+        let cmd: Option<AgentCommand> = {
             let mut rx = cmd_rx.lock().await;
             rx.recv().await
         };
@@ -89,7 +89,7 @@ pub async fn spawn_agent_monitor(
                         .await;
                 } else {
                     info!("Received chat message while idle (provider: {:?}, model: {:?}), responding directly...", provider, model_id);
-                    let state_tx = state_tx.clone();
+                    let state_tx_inner = state_tx.clone();
                     let sidecar = ml_sidecar.clone();
                     let tool_registry = tool_registry.clone();
                     let memory = memory.clone();
@@ -99,7 +99,13 @@ pub async fn spawn_agent_monitor(
                         let planner =
                             crate::agent::planner::AgentPlanner::new(sidecar, tool_registry);
                         match planner
-                            .complete(&content, provider.as_deref(), model_id.as_deref(), None)
+                            .complete(
+                                &content,
+                                provider.as_deref(),
+                                model_id.as_deref(),
+                                None,
+                                Some(state_tx_inner),
+                            )
                             .await
                         {
                             Ok(response) => {
@@ -110,10 +116,6 @@ pub async fn spawn_agent_monitor(
                                 let _ = memory
                                     .store_message(&session_id, "assistant", &response)
                                     .await;
-
-                                // Broadcast response
-                                let _ = state_tx
-                                    .send(AgentState::AssistantMessage { content: response });
                             }
                             Err(e) => {
                                 warn!("Failed to generate chat response: {}", e);
@@ -124,10 +126,46 @@ pub async fn spawn_agent_monitor(
             }
             Some(AgentCommand::AnswerQuestion { response }) => {
                 if let Some(ref handle) = current_loop {
-                    let _ = handle
+                    if let Err(e) = handle
                         .cmd_tx
                         .send(AgentCommand::AnswerQuestion { response })
-                        .await;
+                        .await
+                    {
+                        warn!("Failed to relay answer to agent loop: {}", e);
+                    }
+                }
+            }
+            Some(AgentCommand::Pause) => {
+                if let Some(ref handle) = current_loop {
+                    if let Err(e) = handle.cmd_tx.send(AgentCommand::Pause).await {
+                        warn!("Failed to relay pause to agent loop: {}", e);
+                    }
+                }
+            }
+            Some(AgentCommand::Resume) => {
+                if let Some(ref handle) = current_loop {
+                    if let Err(e) = handle.cmd_tx.send(AgentCommand::Resume).await {
+                        warn!("Failed to relay resume to agent loop: {}", e);
+                    }
+                }
+            }
+            Some(AgentCommand::ApprovePermission {
+                request_id,
+                approved,
+                remember,
+            }) => {
+                if let Some(ref handle) = current_loop {
+                    if let Err(e) = handle
+                        .cmd_tx
+                        .send(AgentCommand::ApprovePermission {
+                            request_id,
+                            approved,
+                            remember,
+                        })
+                        .await
+                    {
+                        warn!("Failed to relay permission to agent loop: {}", e);
+                    }
                 }
             }
             Some(AgentCommand::ChannelMessage {
@@ -163,10 +201,14 @@ pub async fn spawn_agent_monitor(
                     let memory = memory.clone();
                     let channel_manager = channel_manager.clone();
 
+                    let state_tx_inner = state_tx.clone();
                     tauri::async_runtime::spawn(async move {
                         let planner =
                             crate::agent::planner::AgentPlanner::new(sidecar, tool_registry);
-                        match planner.complete(&text, None, None, None).await {
+                        match planner
+                            .complete(&text, None, None, None, Some(state_tx_inner))
+                            .await
+                        {
                             Ok(response) => {
                                 // Store message
                                 let session_id = Uuid::new_v4();
@@ -194,13 +236,20 @@ pub async fn spawn_agent_monitor(
                     });
                 }
             }
-            Some(other) => {
+            Some(AgentCommand::InternalMessage {
+                from_agent_id,
+                to_agent_id,
+                content,
+            }) => {
                 if let Some(ref handle) = current_loop {
-                    if let Err(e) = handle.cmd_tx.send(other).await {
-                        warn!("Failed to relay command to agent loop: {}", e);
-                    }
-                } else {
-                    warn!("Received command but no agent loop is running: {:?}", other);
+                    let _ = handle
+                        .cmd_tx
+                        .send(AgentCommand::InternalMessage {
+                            from_agent_id,
+                            to_agent_id,
+                            content,
+                        })
+                        .await;
                 }
             }
             None => {

@@ -59,6 +59,17 @@ pub async fn resume_agent(state: State<'_, AppState>) -> Result<(), String> {
     Ok(())
 }
 
+/// Answer a question from the agent.
+#[tauri::command]
+pub async fn answer_question(state: State<'_, AppState>, answer: String) -> Result<(), String> {
+    state
+        .agent_cmd_tx
+        .send(AgentCommand::AnswerQuestion { response: answer })
+        .await
+        .map_err(|e| format!("Failed to send answer: {}", e))?;
+    Ok(())
+}
+
 /// Get the current agent state.
 #[tauri::command]
 pub fn get_agent_state(state: State<'_, AppState>) -> AgentState {

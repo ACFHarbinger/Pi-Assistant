@@ -15,6 +15,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 /// A task for the agent to execute.
+#[derive(Clone, Debug)]
 pub struct AgentTask {
     pub id: Uuid,
     pub description: String,
@@ -68,8 +69,22 @@ pub fn spawn_agent_loop(
         permission_engine,
     };
 
-    let join_handle =
-        tokio::spawn(async move { agent_loop(task, state_tx, cmd_rx, resources, token).await });
+    let join_handle = tokio::spawn(async move {
+        match agent_loop(task.clone(), state_tx.clone(), cmd_rx, resources, token).await {
+            Ok(reason) => {
+                info!(task_id = %task.id, ?reason, "Agent loop finished naturally");
+                Ok(reason)
+            }
+            Err(e) => {
+                warn!(task_id = %task.id, error = %e, "Agent loop failed");
+                let _ = state_tx.send(AgentState::Stopped {
+                    task_id: task.id,
+                    reason: pi_core::agent_types::StopReason::Error(e.to_string()),
+                });
+                Err(e)
+            }
+        }
+    });
 
     AgentLoopHandle {
         cancel_token,
@@ -305,6 +320,7 @@ async fn wait_for_answer(
                     Some(AgentCommand::AnswerQuestion { response }) => return Ok(response),
                     Some(AgentCommand::ChannelMessage { text, .. }) => return Ok(text),
                     Some(AgentCommand::Stop) => anyhow::bail!("Stopped by user"),
+                    None => anyhow::bail!("Command channel closed"),
                     _ => continue,
                 }
             }
@@ -329,6 +345,7 @@ async fn wait_for_permission(
                         return Ok((approved, remember));
                     }
                     Some(AgentCommand::Stop) => anyhow::bail!("Stopped by user"),
+                    None => anyhow::bail!("Command channel closed"),
                     _ => continue,
                 }
             }
