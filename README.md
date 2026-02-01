@@ -23,17 +23,39 @@
 
 [![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)](https://pytorch.org/)
 [![PyTorch Lightning](https://img.shields.io/badge/pytorch_lightning-792ee5.svg?style=for-the-badge&logo=pytorchlightning&logoColor=white)](https://lightning.ai/docs/pytorch/stable/)
+[![TorchRL](https://img.shields.io/badge/TorchRL-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)](https://pytorch.org/rl/stable/index.html)
 [![HuggingFace](https://img.shields.io/badge/huggingface-%23FFD21E.svg?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/)
 [![sentence-transformers](https://img.shields.io/badge/sentence_transformers-UKPLab-orange?style=for-the-badge)](https://www.sbert.net/)
-[![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![Optuna](https://img.shields.io/badge/Optuna-3578E5?style=for-the-badge&logo=optuna&logoColor=white)](https://optuna.org/)
+[![Ray](https://img.shields.io/badge/Ray-028CF0?style=for-the-badge&logo=ray&logoColor=white)](https://www.ray.io/)
+[![Gymnasium](https://img.shields.io/badge/Gymnasium-6C6C6C?style=for-the-badge&logo=openai&logoColor=white)](https://gymnasium.farama.org/)
+[![Stable Baselines3](https://img.shields.io/badge/Stable_Baselines3-00A86B?style=for-the-badge&logo=openai&logoColor=white)](https://stable-baselines3.readthedocs.io/)
 [![Hydra](https://img.shields.io/badge/Hydra-1.1+-89CFF0?style=for-the-badge&logo=hydra&logoColor=white)](https://hydra.cc/)
 [![WandB](https://img.shields.io/badge/Weights_%26_Biases-FFBE00.svg?style=for-the-badge&logo=weightsandbiases&logoColor=black)](https://wandb.ai/site)
+[![mlflow](https://img.shields.io/badge/mlflow-0194E2?style=for-the-badge&logo=mlflow&logoColor=white)](https://mlflow.org/)
+
+**Data Science**
+
+[![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![SciPy](https://img.shields.io/badge/SciPy-8CAAE6?style=for-the-badge&logo=scipy&logoColor=white)](https://scipy.org/)
+[![Jupyter](https://img.shields.io/badge/Jupyter-F37626?style=for-the-badge&logo=jupyter&logoColor=white)](https://jupyter.org/)
+[![Plotly](https://img.shields.io/badge/Plotly-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)](https://plotly.com/)
+[![Seaborn](https://img.shields.io/badge/Seaborn-444876?style=for-the-badge&logo=python&logoColor=white)](https://seaborn.pydata.org/)
+
+**Backend & API**
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Pydantic](https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://pydantic.dev/)
+[![HTTPX](https://img.shields.io/badge/HTTPX-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python-httpx.org/)
 
 **Frontend**
 
 [![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Zustand](https://img.shields.io/badge/zustand-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)](https://github.com/pmndrs/zustand)
+[![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-000000?style=for-the-badge&logo=shadcnui&logoColor=white)](https://ui.shadcn.com/)
 
 **Database**
 
@@ -43,12 +65,27 @@
 **Tools**
 
 [![NodeJS](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![NPM](https://img.shields.io/badge/NPM-CB3837?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/)
 [![uv](https://img.shields.io/badge/managed%20by-uv-261230.svg?style=for-the-badge)](https://github.com/astral-sh/uv)
+[![Cargo](https://img.shields.io/badge/Cargo-e68b2f.svg?style=for-the-badge&logo=rust&logoColor=white)](https://doc.rust-lang.org/cargo/)
 [![Gradle](https://img.shields.io/badge/Gradle-02303A.svg?style=for-the-badge&logo=Gradle&logoColor=white)](https://gradle.org/)
 [![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/)
 [![GitHub Actions](https://img.shields.io/badge/github%20actions-%232088FF.svg?style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/features/actions)
 [![Sphinx](https://img.shields.io/badge/Sphinx-001230?style=for-the-badge&logo=sphinx&logoColor=white)](https://www.sphinx-doc.org/)
 [![Just](https://img.shields.io/badge/just-task%20runner-blue?style=for-the-badge&logo=just&logoColor=white)](https://github.com/casey/just)
+
+**DevOps & Infrastructure**
+
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+[![Helm](https://img.shields.io/badge/Helm-0F1689?style=for-the-badge&logo=helm&logoColor=white)](https://helm.sh/)
+
+**Observability**
+
+[![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)](https://prometheus.io/)
+[![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white)](https://grafana.com/)
+[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-000000?style=for-the-badge&logo=opentelemetry&logoColor=white)](https://opentelemetry.io/)
+[![Loguru](https://img.shields.io/badge/Loguru-333333?style=for-the-badge&logo=python&logoColor=white)](https://loguru.readthedocs.io/)
 
 **Hardware**
 
@@ -70,8 +107,12 @@
 [![Mypy](https://img.shields.io/badge/Mypy-2A6DB2?style=for-the-badge&logo=python&logoColor=white)](https://mypy-lang.org/)
 [![Black](https://img.shields.io/badge/Code%20Style-Black-000000?style=for-the-badge&logo=black&logoColor=white)](https://github.com/psf/black)
 [![Prettier](https://img.shields.io/badge/Prettier-F7B93E?style=for-the-badge&logo=prettier&logoColor=black)](https://prettier.io/)
+[![ESLint](https://img.shields.io/badge/ESLint-4B32C3?style=for-the-badge&logo=eslint&logoColor=white)](https://eslint.org/)
 [![Pre-commit](https://img.shields.io/badge/Pre--commit-F8B424?style=for-the-badge&logo=pre-commit&logoColor=black)](https://pre-commit.com/)
 [![pytest](https://img.shields.io/badge/pytest-%23ffffff.svg?style=for-the-badge&logo=pytest&logoColor=0A9EDC)](https://docs.pytest.org/)
+[![Hypothesis](https://img.shields.io/badge/Hypothesis-BD1C2B?style=for-the-badge&logo=python&logoColor=white)](https://hypothesis.readthedocs.io/)
+[![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Cypress](https://img.shields.io/badge/Cypress-17202C?style=for-the-badge&logo=cypress&logoColor=white)](https://www.cypress.io/)
 
 A Universal Agent Harness — a desktop application that hosts an autonomous AI agent capable of controlling the computer, maintaining persistent memory, and training sub-models.
 
