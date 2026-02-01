@@ -11,7 +11,7 @@ This roadmap outlines planned features and enhancements across the Pi-Assistant 
   - Subtask state management (Pending, Running, Blocked, Done) and persistence.
   - TaskTree visualizer in the UI with progress indicators.
 
-### 1.2 Reflection & Self-Correction Loop
+### 1.2 Reflection & Self-Correction Loop [IMPLEMENTED]
 
 After each tool execution, add an explicit reflection step where the agent evaluates whether the result matches expectations. If the result diverges (e.g., a command fails, output is unexpected), the agent should revise its plan before continuing rather than blindly proceeding to the next tool call.
 

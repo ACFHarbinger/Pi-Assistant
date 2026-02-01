@@ -170,6 +170,7 @@ async fn handle_client_message(
                     max_iterations,
                     provider: None,
                     model_id: None,
+                    cost_config: None,
                 },
                 ClientCommand::Stop => AgentCommand::Stop,
                 ClientCommand::Pause => AgentCommand::Pause,

@@ -23,6 +23,7 @@ export default function Settings({
     | "auth"
     | "channels"
     | "agents"
+    | "cost"
     | "marketplace"
     | "reset"
   >("mcp");
@@ -371,6 +372,12 @@ export default function Settings({
             Agents
           </TabButton>
           <TabButton
+            active={activeTab === "cost"}
+            onClick={() => setActiveTab("cost")}
+          >
+            Cost & Limits
+          </TabButton>
+          <TabButton
             active={activeTab === "reset"}
             onClick={() => setActiveTab("reset")}
             className="text-red-500!"
@@ -688,6 +695,72 @@ export default function Settings({
                     >
                       Add
                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "cost" && (
+            <div className="space-y-6">
+              <h3 className="font-bold dark:text-white">Cost & Limits</h3>
+              <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded border border-zinc-200 dark:border-zinc-700">
+                <p className="text-sm text-zinc-500 mb-4">
+                  Configure safety limits for agent sessions. These limits apply
+                  to each new task started.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium dark:text-zinc-300 mb-1">
+                      Max Tokens per Session
+                    </label>
+                    <input
+                      type="number"
+                      className="w-full border p-2 rounded dark:bg-zinc-900 dark:text-white dark:border-zinc-700"
+                      placeholder="e.g. 100000"
+                      value={
+                        useAgentStore.getState().costConfig
+                          .max_tokens_per_session || ""
+                      }
+                      onChange={(e) =>
+                        useAgentStore.getState().setCostConfig({
+                          max_tokens_per_session: e.target.value
+                            ? parseInt(e.target.value)
+                            : null,
+                        })
+                      }
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Total tokens (prompt + completion) allowed before the
+                      agent stops.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium dark:text-zinc-300 mb-1">
+                      Max Cost ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="w-full border p-2 rounded dark:bg-zinc-900 dark:text-white dark:border-zinc-700"
+                      placeholder="e.g. 1.00"
+                      value={
+                        useAgentStore.getState().costConfig
+                          .max_cost_per_session || ""
+                      }
+                      onChange={(e) =>
+                        useAgentStore.getState().setCostConfig({
+                          max_cost_per_session: e.target.value
+                            ? parseFloat(e.target.value)
+                            : null,
+                        })
+                      }
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Maximum estimated cost in USD.
+                    </p>
                   </div>
                 </div>
               </div>

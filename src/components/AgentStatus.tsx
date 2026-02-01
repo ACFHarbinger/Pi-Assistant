@@ -27,6 +27,15 @@ export function AgentStatus() {
         <span className="text-sm font-medium text-gray-300">
           {config.label}
         </span>
+        {state.data?.consecutive_errors &&
+          state.data.consecutive_errors > 0 && (
+            <span
+              className="flex items-center justify-center w-5 h-5 ml-2 text-[10px] font-bold text-white bg-red-500 rounded-full animate-bounce"
+              title="Consecutive Errors"
+            >
+              {state.data.consecutive_errors}
+            </span>
+          )}
       </div>
 
       {/* Control Buttons */}

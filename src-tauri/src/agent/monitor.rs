@@ -38,6 +38,7 @@ pub async fn spawn_agent_monitor(
                 max_iterations,
                 provider,
                 model_id,
+                cost_config,
             }) => {
                 if let Some(ref handle) = current_loop {
                     if !handle.join_handle.is_finished() {
@@ -54,6 +55,7 @@ pub async fn spawn_agent_monitor(
                     session_id: Uuid::new_v4(), // TODO: Persistent session
                     provider: provider.unwrap_or_else(|| "local".to_string()),
                     model_id,
+                    cost_config: cost_config.unwrap_or_default(),
                 };
 
                 let handle = spawn_agent_loop(

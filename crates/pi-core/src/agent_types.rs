@@ -21,6 +21,10 @@ pub enum AgentState {
         task_tree: Vec<Subtask>,
         #[serde(default)]
         active_subtask_id: Option<Uuid>,
+        #[serde(default)]
+        consecutive_errors: u32,
+        #[serde(default)]
+        cost_stats: Option<TokenUsage>,
     },
     Paused {
         task_id: Uuid,
@@ -90,6 +94,8 @@ pub enum AgentCommand {
         max_iterations: Option<u32>,
         provider: Option<String>,
         model_id: Option<String>,
+        #[serde(default)]
+        cost_config: Option<CostConfig>,
     },
     Stop,
     Pause,
@@ -133,6 +139,8 @@ pub struct AgentPlan {
     pub is_complete: bool,
     pub question: Option<String>,
     pub reasoning: String,
+    #[serde(default)]
+    pub reflection: Option<String>,
 }
 
 /// A single tool invocation.
@@ -165,4 +173,19 @@ impl ToolCall {
     pub fn pattern_key(&self) -> String {
         self.display_command()
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct TokenUsage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct CostConfig {
+    pub max_tokens_per_session: Option<u32>,
+    pub max_cost_per_session: Option<f64>,
 }

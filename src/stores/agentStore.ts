@@ -33,6 +33,13 @@ interface AgentState {
     awaiting_permission?: PermissionRequest;
     content?: string;
     is_streaming?: boolean;
+    consecutive_errors?: number;
+    cost_stats?: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    };
+    reflection?: string;
   };
 }
 
@@ -81,6 +88,18 @@ interface AgentStore {
     model: any;
   };
   setClientAIModel: (model: any) => void;
+
+  // Cost Config
+  costConfig: {
+    max_tokens_per_session: number | null;
+    max_cost_per_session: number | null;
+  };
+  setCostConfig: (
+    config: Partial<{
+      max_tokens_per_session: number | null;
+      max_cost_per_session: number | null;
+    }>,
+  ) => void;
 }
 
 export const useAgentStore = create<AgentStore>((set, get) => {
@@ -94,9 +113,12 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     selectedModel: null,
     selectedProvider: null,
     clientAI: {
-      // Initialize clientAI
       isLoaded: false,
       model: null,
+    },
+    costConfig: {
+      max_tokens_per_session: null,
+      max_cost_per_session: null,
     },
   };
 
@@ -112,6 +134,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           maxIterations: null,
           provider: selectedProvider || null,
           modelId: selectedModel || null,
+          costConfig: get().costConfig,
         });
         get().addMessage("system", `Starting task: ${task}`);
         await get().refreshState();
@@ -341,6 +364,11 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     setClientAIModel: (model: any) =>
       set((state) => ({
         clientAI: { ...state.clientAI, isLoaded: true, model },
+      })),
+
+    setCostConfig: (config) =>
+      set((state) => ({
+        costConfig: { ...state.costConfig, ...config },
       })),
   };
 });

@@ -24,6 +24,7 @@ pub struct AgentTask {
     pub session_id: Uuid,
     pub provider: String,
     pub model_id: Option<String>,
+    pub cost_config: pi_core::agent_types::CostConfig,
 }
 
 /// Handle for a running agent loop.
@@ -40,6 +41,9 @@ pub struct AgentPlan {
     pub is_complete: bool,
     pub question: Option<String>,
     pub reasoning: String,
+    pub reflection: Option<String>,
+    #[serde(default)]
+    pub token_usage: Option<pi_core::agent_types::TokenUsage>,
 }
 
 /// Resources shared by the agent loop.
@@ -48,6 +52,7 @@ pub struct AgentResources {
     pub memory: Arc<MemoryManager>,
     pub ml_sidecar: Arc<Mutex<SidecarHandle>>,
     pub permission_engine: Arc<Mutex<PermissionEngine>>,
+    pub cost_manager: Arc<Mutex<crate::agent::cost::CostManager>>,
 }
 
 /// Spawn the agent loop as a background Tokio task.
@@ -63,11 +68,16 @@ pub fn spawn_agent_loop(
     let token = cancel_token.clone();
     let (cmd_tx, cmd_rx) = mpsc::channel(32);
 
+    let cost_manager = Arc::new(Mutex::new(crate::agent::cost::CostManager::new(
+        task.cost_config.clone(),
+    )));
+
     let resources = AgentResources {
         tool_registry,
         memory,
         ml_sidecar,
         permission_engine,
+        cost_manager,
     };
 
     let join_handle = tokio::spawn(async move {
@@ -105,6 +115,8 @@ async fn agent_loop(
 
     let mut iteration: u32 = 0;
     let mut task_manager = TaskManager::new();
+    let mut consecutive_errors: u32 = 0;
+    const MAX_CONSECUTIVE_ERRORS: u32 = 3;
 
     loop {
         // ── Check cancellation ───────────────────────────────────────
@@ -131,6 +143,8 @@ async fn agent_loop(
             iteration,
             task_tree: task_manager.get_tree(),
             active_subtask_id: task_manager.get_active_subtask(),
+            consecutive_errors,
+            cost_stats: Some(resources.cost_manager.lock().await.get_usage()),
         });
 
         // ── Check for incoming commands (non-blocking) ───────────────
@@ -171,6 +185,8 @@ async fn agent_loop(
                         iteration,
                         task_tree: task_manager.get_tree(),
                         active_subtask_id: task_manager.get_active_subtask(),
+                        consecutive_errors,
+                        cost_stats: Some(resources.cost_manager.lock().await.get_usage()),
                     });
                 }
                 AgentCommand::ChannelMessage { text, .. } => {
@@ -189,6 +205,16 @@ async fn agent_loop(
             .memory
             .retrieve_context(&task.description, &task.session_id, 10)
             .await?;
+
+        // Check budget before planning
+        if let Err(e) = resources.cost_manager.lock().await.check_budget() {
+            warn!(task_id = %task.id, error = %e, "Budget exceeded");
+            let _ = state_tx.send(AgentState::Stopped {
+                task_id: task.id,
+                reason: StopReason::Error(e.to_string()),
+            });
+            return Err(e);
+        }
 
         // ── 2. Plan next step (LLM call via sidecar) ─────────────────
         let tools = resources.tool_registry.read().await.list_tools();
@@ -227,6 +253,14 @@ async fn agent_loop(
             "Plan received"
         );
 
+        if let Some(usage) = &plan.token_usage {
+            resources.cost_manager.lock().await.add_usage(usage);
+        }
+
+        if let Some(reflection) = &plan.reflection {
+            info!(reflection = %reflection, "Agent reflection");
+        }
+
         // ── 3. Human-in-the-loop: agent asks a question ─────────────
         if let Some(ref question) = plan.question {
             let _ = state_tx.send(AgentState::Paused {
@@ -246,6 +280,8 @@ async fn agent_loop(
                 iteration,
                 task_tree: task_manager.get_tree(),
                 active_subtask_id: task_manager.get_active_subtask(),
+                consecutive_errors,
+                cost_stats: Some(resources.cost_manager.lock().await.get_usage()),
             });
         }
 
@@ -286,6 +322,8 @@ async fn agent_loop(
                         iteration,
                         task_tree: task_manager.get_tree(),
                         active_subtask_id: task_manager.get_active_subtask(),
+                        consecutive_errors,
+                        cost_stats: Some(resources.cost_manager.lock().await.get_usage()),
                     });
 
                     if !approved {
@@ -368,11 +406,55 @@ async fn agent_loop(
                 .get(&tool_call.tool_name)
                 .ok_or_else(|| anyhow::anyhow!("Unknown tool: {}", tool_call.tool_name))?
                 .clone();
-            let result = tool.execute(tool_call.parameters.clone()).await?;
-            resources
-                .memory
-                .store_tool_result(&task.id, tool_call, &result)
-                .await?;
+            // Execute tool
+            let result = tool.execute(tool_call.parameters.clone()).await;
+
+            // Handle result and error budget
+            let result_str = match result {
+                Ok(res) => {
+                    consecutive_errors = 0; // Reset on success
+                    resources
+                        .memory
+                        .store_tool_result(&task.id, tool_call, &res)
+                        .await?;
+                    res.output
+                }
+                Err(e) => {
+                    consecutive_errors += 1;
+                    warn!(error = %e, consecutive_errors, "Tool execution failed");
+                    let error_msg = format!("Tool failed: {}", e);
+
+                    resources
+                        .memory
+                        .store_tool_result(
+                            &task.id,
+                            tool_call,
+                            &crate::tools::ToolResult::error(&error_msg),
+                        )
+                        .await?;
+
+                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                        let _ = state_tx.send(AgentState::Paused {
+                            task_id: task.id,
+                            question: Some(format!(
+                                "I've encountered {} consecutive errors. The last error was: {}. Should I continue?",
+                                consecutive_errors, e
+                            )),
+                            awaiting_permission: None,
+                        });
+
+                        let answer = wait_for_answer(&mut cmd_rx, &cancel_token).await?;
+                        if answer.to_lowercase().contains("no")
+                            || answer.to_lowercase().contains("stop")
+                        {
+                            return Ok(StopReason::ManualStop);
+                        }
+                        // If user says yes, reset errors and continue
+                        consecutive_errors = 0;
+                    }
+                    error_msg
+                }
+            };
         }
 
         // ── 5. Check completion ──────────────────────────────────────

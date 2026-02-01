@@ -12,6 +12,7 @@ pub async fn start_agent(
     max_iterations: Option<u32>,
     provider: Option<String>,
     model_id: Option<String>,
+    cost_config: Option<pi_core::agent_types::CostConfig>,
 ) -> Result<(), String> {
     state
         .agent_cmd_tx
@@ -20,6 +21,7 @@ pub async fn start_agent(
             max_iterations,
             provider,
             model_id,
+            cost_config,
         })
         .await
         .map_err(|e| format!("Failed to send start command: {}", e))?;

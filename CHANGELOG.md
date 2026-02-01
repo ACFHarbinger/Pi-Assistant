@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Device-aware model placement via `DeviceManager.best_device_for()`
 - **Client-Side AI** — Integrated Candle ML framework compiled to WebAssembly for in-browser inference.
 - **Hierarchical Task Decomposition** — Added a hierarchical planner and subtask management system with UI visualization.
+- **Reflection & Self-Correction Loop** — Implemented error budgeting, reflection in planning, and UI indicators for agent self-evaluation.
 - **Train-Deploy-Use Cycle** — trained models can be deployed as callable tools the agent uses in future iterations
   - `TrainingService.deploy()` loads checkpoint, rebuilds model, registers as `LoadedModel` in the registry
   - `TrainingService.predict()` runs inference with task-type-aware post-processing (classification/regression)

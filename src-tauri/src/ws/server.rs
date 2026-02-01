@@ -185,6 +185,7 @@ async fn webhook_handler(
             max_iterations: None,
             provider: payload.provider,
             model_id: payload.model_id,
+            cost_config: None,
         }
     };
 
