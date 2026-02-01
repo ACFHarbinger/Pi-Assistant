@@ -247,15 +247,39 @@ pub async fn get_models_config() -> Result<ModelsConfig, String> {
                 },
                 ModelInfo {
                     id: "claude-4-5-sonnet-latest".into(),
+                    provider: "anthropic".into(),
+                    path: None,
+                    description: Some("Claude 4.5 Sonnet (Direct)".into()),
+                },
+                ModelInfo {
+                    id: "claude-4-5-opus-latest".into(),
+                    provider: "anthropic".into(),
+                    path: None,
+                    description: Some("Claude 4.5 Opus (Direct)".into()),
+                },
+                ModelInfo {
+                    id: "claude-4-5-haiku-latest".into(),
+                    provider: "anthropic".into(),
+                    path: None,
+                    description: Some("Claude 4.5 Haiku (Direct)".into()),
+                },
+                ModelInfo {
+                    id: "claude-4-5-sonnet-latest".into(),
                     provider: "google".into(),
                     path: None,
-                    description: Some("Claude Sonnet 4.5".into()),
+                    description: Some("Claude 4.5 Sonnet (Antigravity)".into()),
                 },
                 ModelInfo {
                     id: "claude-4-5-opus-latest".into(),
                     provider: "google".into(),
                     path: None,
-                    description: Some("Claude Opus 4.5".into()),
+                    description: Some("Claude 4.5 Opus (Antigravity)".into()),
+                },
+                ModelInfo {
+                    id: "claude-4-5-haiku-latest".into(),
+                    provider: "google".into(),
+                    path: None,
+                    description: Some("Claude 4.5 Haiku (Antigravity)".into()),
                 },
                 ModelInfo {
                     id: "gpt-oss-120b".into(),
@@ -568,4 +592,55 @@ pub async fn save_discord_config(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_default_models_config() {
+        // Ensure no models.json exists for this test to get defaults
+        let config = get_models_config().await.unwrap();
+        let models = config.models;
+
+        // Verify we have anthropic models
+        let anthropic_sonnet = models
+            .iter()
+            .find(|m| m.id == "claude-4-5-sonnet-latest" && m.provider == "anthropic");
+        assert!(
+            anthropic_sonnet.is_some(),
+            "Anthropic Sonnet 4.5 should be present"
+        );
+        assert_eq!(
+            anthropic_sonnet.unwrap().description,
+            Some("Claude 4.5 Sonnet (Direct)".into())
+        );
+
+        let anthropic_haiku = models
+            .iter()
+            .find(|m| m.id == "claude-4-5-haiku-latest" && m.provider == "anthropic");
+        assert!(
+            anthropic_haiku.is_some(),
+            "Anthropic Haiku 4.5 should be present"
+        );
+
+        // Verify we still have google claude models
+        let google_sonnet = models
+            .iter()
+            .find(|m| m.id == "claude-4-5-sonnet-latest" && m.provider == "google");
+        assert!(
+            google_sonnet.is_some(),
+            "Google Claude Sonnet 4.5 should be present"
+        );
+        assert_eq!(
+            google_sonnet.unwrap().description,
+            Some("Claude 4.5 Sonnet (Antigravity)".into())
+        );
+
+        // Verify gpt-oss is still there
+        assert!(models
+            .iter()
+            .any(|m| m.id == "gpt-oss-120b" && m.provider == "google"));
+    }
 }

@@ -115,10 +115,7 @@ impl SidecarHandle {
         };
 
         let sidecar_base = sidecars_root.join(&self.sidecar_dir);
-        let shared_base = sidecars_root.join("shared");
-
         let sidecar_src = sidecar_base.join("src");
-        let shared_src = shared_base.join("src");
 
         // Detect venv python (relative to sidecar_base or workspace root)
         let venv_python = sidecar_base.join(".venv/bin/python");
@@ -142,15 +139,58 @@ impl SidecarHandle {
 
         info!("Setting PYTHONPATH to: {}", python_path);
 
-        let mut child = Command::new(&self.python_path)
+        // Add CUDA libraries from venv to LD_LIBRARY_PATH (for llama-cpp-python GPU support)
+        let mut ld_library_path = std::env::var("LD_LIBRARY_PATH").unwrap_or_default();
+        if let Some(venv_parent) = std::path::Path::new(&self.python_path)
+            .parent()
+            .and_then(|p| p.parent())
+        {
+            let lib_dir = venv_parent.join("lib");
+            if lib_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(lib_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_dir()
+                            && path
+                                .file_name()
+                                .map_or(false, |n| n.to_string_lossy().starts_with("python"))
+                        {
+                            let site_pkgs = path.join("site-packages/nvidia");
+                            if site_pkgs.exists() {
+                                if let Ok(pkgs) = std::fs::read_dir(site_pkgs) {
+                                    for pkg in pkgs.flatten() {
+                                        let lib = pkg.path().join("lib");
+                                        if lib.exists() {
+                                            if !ld_library_path.is_empty() {
+                                                ld_library_path.push(':');
+                                            }
+                                            ld_library_path.push_str(&lib.to_string_lossy());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut command = Command::new(&self.python_path);
+        command
             .arg("-m")
             .arg(&self.sidecar_module)
             .env("PYTHONPATH", python_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit()) // Log to console
-            .kill_on_drop(true)
-            .spawn()?;
+            .kill_on_drop(true);
+
+        if !ld_library_path.is_empty() {
+            info!("Setting LD_LIBRARY_PATH for CUDA: {}", ld_library_path);
+            command.env("LD_LIBRARY_PATH", ld_library_path);
+        }
+
+        let mut child = command.spawn()?;
 
         let stdin = child
             .stdin

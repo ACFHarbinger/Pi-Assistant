@@ -1,48 +1,29 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAgentStore } from "../stores/agentStore";
-import { invoke } from "@tauri-apps/api/core";
 
 export function ChatInterface() {
-  const { messages, state, sendMessage } = useAgentStore();
+  const {
+    messages,
+    state,
+    sendMessage,
+    availableModels,
+    selectedModel,
+    selectedProvider,
+    fetchModels,
+    setSelectedModel,
+    setSelectedProvider,
+  } = useAgentStore();
   const [input, setInput] = useState("");
-  const [availableModels, setAvailableModels] = useState<
-    { id: string; provider: string }[]
-  >([]);
-  const [currentModel, setCurrentModel] = useState<string | null>(null);
-  const [currentProvider, setCurrentProvider] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load available models and current selection
   useEffect(() => {
-    const loadConfigs = async () => {
-      try {
-        const models = await invoke<{
-          models: { id: string; provider: string }[];
-        }>("get_models_config");
-        setAvailableModels(models.models);
-
-        const current = await invoke<string | null>("get_current_model");
-        setCurrentModel(current);
-
-        // Initialize provider from current model if found
-        if (current) {
-          const model = models.models.find((m) => m.id === current);
-          if (model) setCurrentProvider(model.provider);
-        } else if (models.models.length > 0) {
-          setCurrentProvider(models.models[0].provider);
-        }
-      } catch (e) {
-        console.error("Failed to load model configs:", e);
-      }
-    };
-    loadConfigs();
+    fetchModels();
   }, []);
 
   const handleModelChange = async (id: string) => {
     try {
-      await invoke("save_current_model", { modelId: id });
-      await invoke("load_model", { modelId: id });
-      setCurrentModel(id);
+      await setSelectedModel(id);
     } catch (e) {
       console.error("Failed to switch model:", e);
       alert("Failed to switch model: " + e);
@@ -50,16 +31,11 @@ export function ChatInterface() {
   };
 
   const handleProviderChange = (provider: string) => {
-    setCurrentProvider(provider);
-    // Automatically select first model of this provider
-    const firstModel = availableModels.find((m) => m.provider === provider);
-    if (firstModel) {
-      handleModelChange(firstModel.id);
-    }
+    setSelectedProvider(provider);
   };
 
   const filteredModels = availableModels.filter(
-    (m) => m.provider === currentProvider,
+    (m) => m.provider === selectedProvider,
   );
   const uniqueProviders = Array.from(
     new Set(availableModels.map((m) => m.provider)),
@@ -73,11 +49,7 @@ export function ChatInterface() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-    sendMessage(
-      input.trim(),
-      currentProvider || undefined,
-      currentModel || undefined,
-    );
+    sendMessage(input.trim());
     setInput("");
   };
 
@@ -99,7 +71,7 @@ export function ChatInterface() {
               Provider:
             </span>
             <select
-              value={currentProvider || ""}
+              value={selectedProvider || ""}
               onChange={(e) => handleProviderChange(e.target.value)}
               className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500/50 appearance-none cursor-pointer capitalize"
             >
@@ -117,7 +89,7 @@ export function ChatInterface() {
               Model:
             </span>
             <select
-              value={currentModel || ""}
+              value={selectedModel || ""}
               onChange={(e) => handleModelChange(e.target.value)}
               className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500/50 appearance-none cursor-pointer"
             >

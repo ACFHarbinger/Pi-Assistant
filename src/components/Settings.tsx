@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-shell";
+import { useAgentStore } from "../stores/agentStore";
 
 export default function Settings({
   isOpen,
@@ -9,6 +10,11 @@ export default function Settings({
   isOpen: boolean;
   onClose: () => void;
 }) {
+  const {
+    loadModel,
+    unloadModel,
+    fetchModels: refreshGlobalModels,
+  } = useAgentStore();
   const [activeTab, setActiveTab] = useState<
     | "mcp"
     | "tools"
@@ -74,6 +80,8 @@ export default function Settings({
       setTelegramConfig(tg);
       const dc = await invoke("get_discord_config");
       setDiscordConfig(dc);
+      // Sync global model list for ChatInterface
+      await refreshGlobalModels();
     } catch (e) {
       console.error("Failed to load config:", e);
     }
@@ -117,11 +125,8 @@ export default function Settings({
 
   async function handleLoadModel(id: string) {
     try {
-      await invoke("load_model", {
-        modelId: id,
-        backend: localBackend === "auto" ? null : localBackend,
-      });
-      refreshConfig();
+      await loadModel(id, localBackend === "auto" ? null : localBackend);
+      await refreshConfig();
       alert("Model loaded!");
     } catch (e) {
       console.error(e);
@@ -131,8 +136,8 @@ export default function Settings({
 
   async function handleUnloadModel(id: string) {
     try {
-      await invoke("unload_model", { modelId: id });
-      refreshConfig();
+      await unloadModel(id);
+      await refreshConfig();
       alert("Model unloaded!");
     } catch (e) {
       console.error(e);

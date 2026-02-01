@@ -35,20 +35,29 @@ interface AgentStore {
   isLoading: boolean;
   error: string | null;
 
+  // Model Selection
+  availableModels: { id: string; provider: string }[];
+  selectedModel: string | null;
+  selectedProvider: string | null;
+
   // Actions
   startAgent: (task: string) => Promise<void>;
   stopAgent: () => Promise<void>;
   pauseAgent: () => Promise<void>;
   resumeAgent: () => Promise<void>;
-  sendMessage: (
-    content: string,
-    provider?: string,
-    modelId?: string,
-  ) => Promise<void>;
+  sendMessage: (content: string) => Promise<void>;
   refreshState: () => Promise<void>;
   addMessage: (role: Message["role"], content: string) => void;
   clearError: () => void;
   setupListeners: () => Promise<UnlistenFn>;
+  fetchModels: () => Promise<void>;
+  loadModel: (modelId: string, backend?: string | null) => Promise<void>;
+  unloadModel: (modelId: string) => Promise<void>;
+
+  // Model Selection Actions
+  setModels: (models: { id: string; provider: string }[]) => void;
+  setSelectedModel: (modelId: string | null) => Promise<void>;
+  setSelectedProvider: (provider: string | null) => void;
 }
 
 export const useAgentStore = create<AgentStore>((set, get) => {
@@ -58,19 +67,23 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     messages: [],
     isLoading: false,
     error: null,
+    availableModels: [],
+    selectedModel: null,
+    selectedProvider: null,
   };
 
   return {
     ...initialState,
 
-    startAgent: async (task: string, provider?: string, modelId?: string) => {
+    startAgent: async (task: string) => {
       set({ isLoading: true, error: null });
+      const { selectedProvider, selectedModel } = get();
       try {
         await invoke("start_agent", {
           task,
           maxIterations: null,
-          provider: provider || null,
-          modelId: modelId || null,
+          provider: selectedProvider || null,
+          modelId: selectedModel || null,
         });
         get().addMessage("system", `Starting task: ${task}`);
         await get().refreshState();
@@ -112,20 +125,90 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       }
     },
 
-    sendMessage: async (
-      content: string,
-      provider?: string,
-      modelId?: string,
-    ) => {
+    sendMessage: async (content: string) => {
       get().addMessage("user", content);
+      const { selectedProvider, selectedModel } = get();
       try {
         await invoke("send_message", {
           message: content,
-          provider: provider || null,
-          modelId: modelId || null,
+          provider: selectedProvider || null,
+          modelId: selectedModel || null,
         });
       } catch (e) {
         set({ error: String(e) });
+      }
+    },
+
+    fetchModels: async () => {
+      try {
+        const cloud = await invoke<{
+          models: { id: string; provider: string }[];
+        }>("get_models_config");
+
+        const local = await invoke<any[]>("list_local_models");
+        const loadedLocalModels = local
+          .filter((m) => m.loaded)
+          .map((m) => ({ id: m.model_id, provider: "local" }));
+
+        const allModels = [...cloud.models, ...loadedLocalModels];
+        set({ availableModels: allModels });
+
+        const current = await invoke<string | null>("get_current_model");
+        if (current) {
+          set({ selectedModel: current });
+          const model = allModels.find((m) => m.id === current);
+          if (model) set({ selectedProvider: model.provider });
+        } else if (allModels.length > 0) {
+          set({ selectedProvider: allModels[0].provider });
+        }
+      } catch (e) {
+        console.error("Store: Failed to fetch models:", e);
+      }
+    },
+
+    loadModel: async (modelId: string, backend: string | null = null) => {
+      try {
+        await invoke("load_model", { modelId, backend });
+        await get().fetchModels();
+      } catch (e) {
+        console.error("Store: Failed to load model:", e);
+        throw e;
+      }
+    },
+
+    unloadModel: async (modelId: string) => {
+      try {
+        await invoke("unload_model", { modelId });
+        await get().fetchModels();
+      } catch (e) {
+        console.error("Store: Failed to unload model:", e);
+        throw e;
+      }
+    },
+
+    setModels: (models) => set({ availableModels: models }),
+
+    setSelectedModel: async (modelId) => {
+      try {
+        if (modelId) {
+          await invoke("save_current_model", { modelId });
+          // The original code had `await invoke("load_model", { modelId });` here.
+          // The provided edit removes it. Assuming the edit is intentional.
+        }
+        set({ selectedModel: modelId });
+      } catch (e) {
+        set({ error: String(e) });
+        throw e;
+      }
+    },
+
+    setSelectedProvider: (provider) => {
+      set({ selectedProvider: provider });
+      // Automatically select first model of this provider
+      const { availableModels } = get();
+      const firstModel = availableModels.find((m) => m.provider === provider);
+      if (firstModel) {
+        get().setSelectedModel(firstModel.id);
       }
     },
 

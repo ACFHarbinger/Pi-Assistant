@@ -75,8 +75,45 @@ impl VoiceManager {
         model_path: std::path::PathBuf,
         sample_rate: f32,
     ) -> anyhow::Result<()> {
+        self.ensure_model_exists(&model_path).await?;
         let detector = WakeWordDetector::new(model_path, sample_rate)?;
         self.detector = Some(Arc::new(detector));
+        Ok(())
+    }
+
+    /// Automatically download and extract the Vosk model if it doesn't exist.
+    pub async fn ensure_model_exists(&self, path: &std::path::PathBuf) -> anyhow::Result<()> {
+        if path.exists() {
+            return Ok(());
+        }
+
+        info!("Vosk model not found at {:?}. Downloading...", path);
+        let parent = path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Invalid model path"))?;
+        tokio::fs::create_dir_all(parent).await?;
+
+        let url = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip";
+        let response = reqwest::get(url).await?.bytes().await?;
+
+        let zip_path = parent.join("vosk-model.zip");
+        tokio::fs::write(&zip_path, response).await?;
+
+        info!("Extracting Vosk model...");
+        let status = tokio::process::Command::new("unzip")
+            .arg("-q")
+            .arg(&zip_path)
+            .arg("-d")
+            .arg(parent)
+            .status()
+            .await?;
+
+        if !status.success() {
+            return Err(anyhow::anyhow!("Failed to extract Vosk model"));
+        }
+
+        tokio::fs::remove_file(zip_path).await?;
+        info!("Vosk model installed successfully at {:?}", path);
         Ok(())
     }
 
