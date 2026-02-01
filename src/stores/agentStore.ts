@@ -53,6 +53,7 @@ interface AgentStore {
   fetchModels: () => Promise<void>;
   loadModel: (modelId: string, backend?: string | null) => Promise<void>;
   unloadModel: (modelId: string) => Promise<void>;
+  fetchHistory: () => Promise<void>;
 
   // Model Selection Actions
   setModels: (models: { id: string; provider: string }[]) => void;
@@ -126,7 +127,9 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     sendMessage: async (content: string) => {
+      // Optimistic update
       get().addMessage("user", content);
+
       const { selectedProvider, selectedModel } = get();
       try {
         await invoke("send_message", {
@@ -186,6 +189,21 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       }
     },
 
+    fetchHistory: async () => {
+      try {
+        const history = await invoke<any[]>("get_history");
+        const messages = history.map((m) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant" | "system",
+          content: m.content,
+          timestamp: new Date(m.timestamp),
+        }));
+        set({ messages });
+      } catch (e) {
+        console.error("Store: Failed to fetch history:", e);
+      }
+    },
+
     setModels: (models) => set({ availableModels: models }),
 
     setSelectedModel: async (modelId) => {
@@ -222,6 +240,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     },
 
     addMessage: (role, content) => {
+      // Note: Backend also stores the message. This is for UI responsiveness.
+      // We don't want to double-add if we just fetched history.
       const message: Message = {
         id: crypto.randomUUID(),
         role,
@@ -234,6 +254,9 @@ export const useAgentStore = create<AgentStore>((set, get) => {
     clearError: () => set({ error: null }),
 
     setupListeners: async () => {
+      // Load initial history
+      await get().fetchHistory();
+
       const unlisten = await listen<AgentState>(
         "agent-state-changed",
         (event) => {

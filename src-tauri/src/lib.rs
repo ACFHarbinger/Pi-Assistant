@@ -40,6 +40,7 @@ pub fn run() {
                 let agent_cmd_rx = state.agent_cmd_rx.clone();
                 let agent_state_tx = state.agent_state_tx.clone();
                 let channel_manager = state.channel_manager.clone();
+                let chat_session_id = state.chat_session_id.clone();
 
                 tauri::async_runtime::spawn(async move {
                     agent::spawn_agent_monitor(
@@ -50,6 +51,7 @@ pub fn run() {
                         ml_sidecar,
                         permissions,
                         channel_manager,
+                        chat_session_id,
                     )
                     .await;
                 });

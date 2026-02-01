@@ -12,6 +12,13 @@ pub async fn send_message(
     provider: Option<String>,
     model_id: Option<String>,
 ) -> Result<(), String> {
+    let session_id = *state.chat_session_id.read().await;
+    // Store user message immediately
+    let _ = state
+        .memory
+        .store_message(&session_id, "user", &message)
+        .await;
+
     state
         .agent_cmd_tx
         .send(AgentCommand::ChatMessage {
@@ -24,9 +31,26 @@ pub async fn send_message(
     Ok(())
 }
 
-/// Get chat history (placeholder for now).
+/// Get chat history.
 #[tauri::command]
-pub fn get_history() -> Vec<serde_json::Value> {
-    // TODO: Implement actual history retrieval from memory
-    vec![]
+pub async fn get_history(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+    let session_id = *state.chat_session_id.read().await;
+    let messages = state
+        .memory
+        .get_recent_messages(&session_id, 100)
+        .map_err(|e| e.to_string())?;
+
+    let history = messages
+        .into_iter()
+        .map(|m| {
+            serde_json::json!({
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "timestamp": m.created_at,
+            })
+        })
+        .collect();
+
+    Ok(history)
 }

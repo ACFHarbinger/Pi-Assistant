@@ -20,6 +20,7 @@ pub async fn spawn_agent_monitor(
     ml_sidecar: Arc<Mutex<SidecarHandle>>,
     permission_engine: Arc<Mutex<PermissionEngine>>,
     channel_manager: Arc<ChannelManager>,
+    chat_session_id: Arc<RwLock<Uuid>>,
 ) {
     info!("Agent monitor task started");
 
@@ -92,6 +93,7 @@ pub async fn spawn_agent_monitor(
                     let sidecar = ml_sidecar.clone();
                     let tool_registry = tool_registry.clone();
                     let memory = memory.clone();
+                    let chat_session_id = chat_session_id.clone();
 
                     tauri::async_runtime::spawn(async move {
                         let planner =
@@ -102,7 +104,7 @@ pub async fn spawn_agent_monitor(
                         {
                             Ok(response) => {
                                 // Store user message
-                                let session_id = Uuid::new_v4(); // TODO: Global session
+                                let session_id = *chat_session_id.read().await;
                                 let _ = memory.store_message(&session_id, "user", &content).await;
                                 // Store assistant message
                                 let _ = memory

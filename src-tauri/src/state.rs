@@ -10,6 +10,7 @@ use crate::tools::ToolRegistry;
 use pi_core::agent_types::{AgentCommand, AgentState};
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch, Mutex, RwLock};
+use uuid::Uuid;
 
 /// Shared application state.
 pub struct AppState {
@@ -26,6 +27,7 @@ pub struct AppState {
     pub cron_manager: Arc<CronManager>,
     pub voice_manager: Arc<Mutex<crate::voice::VoiceManager>>,
     pub skill_manager: Arc<tokio::sync::RwLock<SkillManager>>,
+    pub chat_session_id: Arc<RwLock<Uuid>>,
 }
 
 impl AppState {
@@ -85,6 +87,12 @@ impl AppState {
         }
         let skill_manager_arc = Arc::new(tokio::sync::RwLock::new(skill_manager));
 
+        let chat_session_id = Arc::new(RwLock::new(
+            memory
+                .create_session(Some("Chat"))
+                .expect("Failed to create chat session"),
+        ));
+
         Self {
             agent_state_tx,
             agent_state_rx,
@@ -99,6 +107,7 @@ impl AppState {
             cron_manager: cron_manager_arc,
             voice_manager: voice_manager_arc,
             skill_manager: skill_manager_arc,
+            chat_session_id,
         }
     }
 }
