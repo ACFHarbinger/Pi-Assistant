@@ -80,6 +80,7 @@ impl AgentPlanner {
     /// Generate a simple completion (for chat responses) with streaming.
     pub async fn complete(
         &self,
+        agent_id: uuid::Uuid,
         prompt: &str,
         provider: Option<&str>,
         model_id: Option<&str>,
@@ -100,6 +101,7 @@ impl AgentPlanner {
         // Send initial empty message to signal 'thinking' state
         if let Some(ref tx) = state_tx {
             let _ = tx.send(AgentState::AssistantMessage {
+                agent_id,
                 content: String::new(),
                 is_streaming: true,
             });
@@ -117,6 +119,7 @@ impl AgentPlanner {
                     accumulated_text.push_str(token);
                     if let Some(ref tx) = state_tx_clone {
                         let _ = tx.send(AgentState::AssistantMessage {
+                            agent_id,
                             content: accumulated_text.clone(),
                             is_streaming: true,
                         });
@@ -138,6 +141,7 @@ impl AgentPlanner {
         // Broadcast final message (non-streaming)
         if let Some(tx) = state_tx {
             let _ = tx.send(AgentState::AssistantMessage {
+                agent_id,
                 content: text.clone(),
                 is_streaming: false,
             });

@@ -168,7 +168,10 @@ impl Handler {
                 }
             }
             "stop" => {
-                let _ = self.message_tx.send(AgentCommand::Stop).await;
+                let _ = self
+                    .message_tx
+                    .send(AgentCommand::Stop { agent_id: None })
+                    .await;
                 "🛑 Stop command sent to agent.".to_string()
             }
             _ => "❓ Unknown command.".to_string(),

@@ -22,6 +22,7 @@ pub async fn send_message(
     state
         .agent_cmd_tx
         .send(AgentCommand::ChatMessage {
+            agent_id: None,
             content: message,
             provider,
             model_id,

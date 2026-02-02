@@ -2,7 +2,11 @@ import { useState } from "react";
 import { useAgentStore } from "../stores/agentStore";
 
 export function TaskInput() {
-  const { state, startAgent, isLoading, error, clearError } = useAgentStore();
+  const { agents, activeAgentId, startAgent, isLoading, error, clearError } =
+    useAgentStore();
+  const state = (activeAgentId ? agents[activeAgentId] : undefined) || {
+    status: "Idle",
+  };
   const [task, setTask] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -99,7 +99,10 @@ impl AgentPool {
             // Stop the loop if running
             if let Some(handle) = instance.loop_handle.take() {
                 handle.cancel_token.cancel();
-                let _ = handle.cmd_tx.send(AgentCommand::Stop).await;
+                let _ = handle
+                    .cmd_tx
+                    .send(AgentCommand::Stop { agent_id: None })
+                    .await;
             }
             info!(agent = %name, "Removed agent instance");
             Ok(())
@@ -215,7 +218,10 @@ impl AgentPool {
 
         if let Some(handle) = agent.loop_handle.take() {
             handle.cancel_token.cancel();
-            let _ = handle.cmd_tx.send(AgentCommand::Stop).await;
+            let _ = handle
+                .cmd_tx
+                .send(AgentCommand::Stop { agent_id: None })
+                .await;
             info!(agent = %agent_name, "Stopped agent task");
         }
         Ok(())

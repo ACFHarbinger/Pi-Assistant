@@ -1,7 +1,10 @@
-import { useAgentStore } from "../stores/agentStore";
+import { useAgentStore, AgentState } from "../stores/agentStore";
 
 export const CostDashboard: React.FC = () => {
-  const state = useAgentStore((s) => s.state);
+  const { agents, activeAgentId } = useAgentStore();
+  const state =
+    (activeAgentId ? agents[activeAgentId] : undefined) ||
+    ({ status: "Idle", data: {} } as AgentState);
   const stats = state.data?.cost_stats;
 
   if (!stats) return null;

@@ -18,7 +18,8 @@ Object.defineProperty(global, "crypto", {
 describe("useAgentStore", () => {
   beforeEach(() => {
     useAgentStore.setState({
-      state: { status: "Idle" },
+      agents: { "test-agent": { status: "Idle" } },
+      activeAgentId: "test-agent",
       messages: [],
       isLoading: false,
       error: null,
@@ -28,7 +29,7 @@ describe("useAgentStore", () => {
 
   it("has initial state", () => {
     const state = useAgentStore.getState();
-    expect(state.state.status).toBe("Idle");
+    expect(state.agents["test-agent"].status).toBe("Idle");
     expect(state.messages).toEqual([]);
   });
 

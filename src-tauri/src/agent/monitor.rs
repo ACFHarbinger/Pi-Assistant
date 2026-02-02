@@ -6,13 +6,15 @@ use crate::safety::PermissionEngine;
 use crate::tools::ToolRegistry;
 use pi_core::agent_types::{AgentCommand, AgentState};
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch, Mutex, RwLock};
+
 use tracing::{info, warn};
 use uuid::Uuid;
 
-/// Monitor task that processes background agent commands.
-pub async fn spawn_agent_monitor(
+/// Monitor task that processes background agent commands and manages multiple agent loops.
+pub async fn spawn_agent_coordinator(
     state_tx: watch::Sender<AgentState>,
     cmd_rx: Arc<Mutex<mpsc::Receiver<AgentCommand>>>,
     tool_registry: Arc<RwLock<ToolRegistry>>,
@@ -22,11 +24,14 @@ pub async fn spawn_agent_monitor(
     channel_manager: Arc<ChannelManager>,
     chat_session_id: Arc<RwLock<Uuid>>,
 ) {
-    info!("Agent monitor task started");
+    info!("Agent coordinator task started");
 
-    let mut current_loop: Option<AgentLoopHandle> = None;
+    let mut active_agents: HashMap<Uuid, AgentLoopHandle> = HashMap::new();
 
     loop {
+        // Cleanup finished agents
+        active_agents.retain(|_, handle| !handle.join_handle.is_finished());
+
         let cmd: Option<AgentCommand> = {
             let mut rx = cmd_rx.lock().await;
             rx.recv().await
@@ -40,16 +45,12 @@ pub async fn spawn_agent_monitor(
                 model_id,
                 cost_config,
             }) => {
-                if let Some(ref handle) = current_loop {
-                    if !handle.join_handle.is_finished() {
-                        warn!("Agent loop already running, ignoring start command");
-                        continue;
-                    }
-                }
+                let agent_id = Uuid::new_v4();
+                info!(%agent_id, "Starting new agent task: {}", description);
 
-                info!("Starting agent task: {}", description);
                 let task = AgentTask {
                     id: Uuid::new_v4(),
+                    agent_id,
                     description,
                     max_iterations: max_iterations.unwrap_or(20),
                     session_id: Uuid::new_v4(), // TODO: Persistent session
@@ -67,29 +68,100 @@ pub async fn spawn_agent_monitor(
                     permission_engine.clone(),
                 );
 
-                current_loop = Some(handle);
+                active_agents.insert(agent_id, handle);
             }
-            Some(AgentCommand::Stop) => {
-                if let Some(handle) = current_loop.take() {
-                    info!("Stopping agent loop");
-                    handle.cancel_token.cancel();
-                    // Also send Stop command to break out of wait_for_* blocks
-                    let _ = handle.cmd_tx.send(AgentCommand::Stop).await;
+            Some(AgentCommand::Stop { agent_id }) => {
+                if let Some(id) = agent_id {
+                    if let Some(handle) = active_agents.remove(&id) {
+                        info!(%id, "Stopping agent loop");
+                        handle.cancel_token.cancel();
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::Stop { agent_id: Some(id) })
+                            .await;
+                    }
+                } else {
+                    // Stop all
+                    info!("Stopping all agent loops");
+                    for (_, handle) in active_agents.drain() {
+                        handle.cancel_token.cancel();
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::Stop { agent_id: None })
+                            .await;
+                    }
+                }
+            }
+            Some(AgentCommand::Pause { agent_id }) => {
+                if let Some(id) = agent_id {
+                    if let Some(handle) = active_agents.get(&id) {
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::Pause { agent_id: Some(id) })
+                            .await;
+                    }
+                } else {
+                    // Pause all
+                    for (_, handle) in &active_agents {
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::Pause { agent_id: None })
+                            .await;
+                    }
+                }
+            }
+            Some(AgentCommand::Resume { agent_id }) => {
+                if let Some(id) = agent_id {
+                    if let Some(handle) = active_agents.get(&id) {
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::Resume { agent_id: Some(id) })
+                            .await;
+                    }
+                } else {
+                    // Resume all
+                    for (_, handle) in &active_agents {
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::Resume { agent_id: None })
+                            .await;
+                    }
                 }
             }
             Some(AgentCommand::ChatMessage {
                 content,
                 provider,
                 model_id,
+                agent_id,
             }) => {
-                if let Some(ref handle) = current_loop {
-                    // Try to send to loop first (it might be waiting for AnswerQuestion,
-                    // but we'll treat ChatMessage as AnswerQuestion too if it fits)
+                // Route to specific agent if ID provided, else look for any running agent, else spawn one-off
+                if let Some(id) = agent_id {
+                    if let Some(handle) = active_agents.get(&id) {
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::ChatMessage {
+                                content: content.clone(),
+                                provider: provider.clone(),
+                                model_id: model_id.clone(),
+                                agent_id: Some(id),
+                            })
+                            .await;
+                    } else {
+                        warn!(%id, "Agent not found for chat message");
+                    }
+                } else if let Some((id, handle)) = active_agents.iter().next() {
+                    // Default to first available agent
                     let _ = handle
                         .cmd_tx
-                        .send(AgentCommand::AnswerQuestion { response: content })
+                        .send(AgentCommand::ChatMessage {
+                            content: content.clone(),
+                            provider: provider.clone(),
+                            model_id: model_id.clone(),
+                            agent_id: Some(*id),
+                        })
                         .await;
                 } else {
+                    // No agents running, respond directly (one-off)
                     info!("Received chat message while idle (provider: {:?}, model: {:?}), responding directly...", provider, model_id);
                     let state_tx_inner = state_tx.clone();
                     let sidecar = ml_sidecar.clone();
@@ -102,6 +174,7 @@ pub async fn spawn_agent_monitor(
                             crate::agent::planner::AgentPlanner::new(sidecar, tool_registry);
                         match planner
                             .complete(
+                                Uuid::nil(),
                                 &content,
                                 provider.as_deref(),
                                 model_id.as_deref(),
@@ -126,48 +199,56 @@ pub async fn spawn_agent_monitor(
                     });
                 }
             }
-            Some(AgentCommand::AnswerQuestion { response }) => {
-                if let Some(ref handle) = current_loop {
-                    if let Err(e) = handle
+            Some(AgentCommand::AnswerQuestion { agent_id, response }) => {
+                if let Some(id) = agent_id {
+                    if let Some(handle) = active_agents.get(&id) {
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::AnswerQuestion {
+                                agent_id: Some(id),
+                                response,
+                            })
+                            .await;
+                    }
+                } else if let Some((id, handle)) = active_agents.iter().next() {
+                    // Fallback to first
+                    let _ = handle
                         .cmd_tx
-                        .send(AgentCommand::AnswerQuestion { response })
-                        .await
-                    {
-                        warn!("Failed to relay answer to agent loop: {}", e);
-                    }
-                }
-            }
-            Some(AgentCommand::Pause) => {
-                if let Some(ref handle) = current_loop {
-                    if let Err(e) = handle.cmd_tx.send(AgentCommand::Pause).await {
-                        warn!("Failed to relay pause to agent loop: {}", e);
-                    }
-                }
-            }
-            Some(AgentCommand::Resume) => {
-                if let Some(ref handle) = current_loop {
-                    if let Err(e) = handle.cmd_tx.send(AgentCommand::Resume).await {
-                        warn!("Failed to relay resume to agent loop: {}", e);
-                    }
+                        .send(AgentCommand::AnswerQuestion {
+                            agent_id: Some(*id),
+                            response,
+                        })
+                        .await;
                 }
             }
             Some(AgentCommand::ApprovePermission {
+                agent_id,
                 request_id,
                 approved,
                 remember,
             }) => {
-                if let Some(ref handle) = current_loop {
-                    if let Err(e) = handle
+                if let Some(id) = agent_id {
+                    if let Some(handle) = active_agents.get(&id) {
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::ApprovePermission {
+                                agent_id: Some(id),
+                                request_id,
+                                approved,
+                                remember,
+                            })
+                            .await;
+                    }
+                } else if let Some((id, handle)) = active_agents.iter().next() {
+                    let _ = handle
                         .cmd_tx
                         .send(AgentCommand::ApprovePermission {
+                            agent_id: Some(*id),
                             request_id,
                             approved,
                             remember,
                         })
-                        .await
-                    {
-                        warn!("Failed to relay permission to agent loop: {}", e);
-                    }
+                        .await;
                 }
             }
             Some(AgentCommand::ChannelMessage {
@@ -179,20 +260,23 @@ pub async fn spawn_agent_monitor(
                 chat_id,
                 media,
             }) => {
-                if let Some(ref handle) = current_loop {
-                    // Forward to running loop
-                    let _ = handle
-                        .cmd_tx
-                        .send(AgentCommand::ChannelMessage {
-                            id,
-                            channel,
-                            sender_id,
-                            sender_name,
-                            text,
-                            chat_id,
-                            media,
-                        })
-                        .await;
+                // Broadcast to all agents or route intelligently?
+                // For now, if agents are running, broadcast. If not, one-off.
+                if !active_agents.is_empty() {
+                    for (_, handle) in &active_agents {
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::ChannelMessage {
+                                id: id.clone(),
+                                channel: channel.clone(),
+                                sender_id: sender_id.clone(),
+                                sender_name: sender_name.clone(),
+                                text: text.clone(),
+                                chat_id: chat_id.clone(),
+                                media: media.clone(),
+                            })
+                            .await;
+                    }
                 } else {
                     info!(
                         "Received channel message ({}) from {} while idle, responding...",
@@ -208,7 +292,7 @@ pub async fn spawn_agent_monitor(
                         let planner =
                             crate::agent::planner::AgentPlanner::new(sidecar, tool_registry);
                         match planner
-                            .complete(&text, None, None, None, Some(state_tx_inner))
+                            .complete(Uuid::nil(), &text, None, None, None, Some(state_tx_inner))
                             .await
                         {
                             Ok(response) => {
@@ -243,15 +327,18 @@ pub async fn spawn_agent_monitor(
                 to_agent_id,
                 content,
             }) => {
-                if let Some(ref handle) = current_loop {
-                    let _ = handle
-                        .cmd_tx
-                        .send(AgentCommand::InternalMessage {
-                            from_agent_id,
-                            to_agent_id,
-                            content,
-                        })
-                        .await;
+                // Route to target agent
+                if let Ok(to_uuid) = Uuid::parse_str(&to_agent_id) {
+                    if let Some(handle) = active_agents.get(&to_uuid) {
+                        let _ = handle
+                            .cmd_tx
+                            .send(AgentCommand::InternalMessage {
+                                from_agent_id,
+                                to_agent_id: to_agent_id.clone(),
+                                content,
+                            })
+                            .await;
+                    }
                 }
             }
             None => {

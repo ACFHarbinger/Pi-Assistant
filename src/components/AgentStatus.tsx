@@ -1,9 +1,16 @@
-import { useAgentStore } from "../stores/agentStore";
+import { useAgentStore, AgentState } from "../stores/agentStore";
 
-export function AgentStatus() {
-  const { state, stopAgent, pauseAgent, resumeAgent } = useAgentStore();
+interface AgentStatusProps {
+  state: AgentState;
+}
 
-  const statusConfig = {
+export function AgentStatus({ state }: AgentStatusProps) {
+  const { stopAgent, pauseAgent, resumeAgent } = useAgentStore();
+
+  const statusConfig: Record<
+    string,
+    { color: string; label: string; pulse: boolean }
+  > = {
     Idle: { color: "bg-gray-500", label: "Idle", pulse: false },
     Running: { color: "bg-green-500", label: "Running", pulse: true },
     Paused: { color: "bg-yellow-500", label: "Paused", pulse: false },
@@ -43,13 +50,13 @@ export function AgentStatus() {
         {state.status === "Running" && (
           <>
             <button
-              onClick={pauseAgent}
+              onClick={() => pauseAgent()}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 transition-colors"
             >
               Pause
             </button>
             <button
-              onClick={stopAgent}
+              onClick={() => stopAgent()}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
             >
               Stop
@@ -59,13 +66,13 @@ export function AgentStatus() {
         {state.status === "Paused" && (
           <>
             <button
-              onClick={resumeAgent}
+              onClick={() => resumeAgent()}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
             >
               Resume
             </button>
             <button
-              onClick={stopAgent}
+              onClick={() => stopAgent()}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
             >
               Stop

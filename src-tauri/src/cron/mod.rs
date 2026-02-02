@@ -113,6 +113,7 @@ impl CronManager {
                     content: format!("Proactive Trigger: {}", task_desc),
                     provider: None,
                     model_id: None,
+                    agent_id: None,
                 };
                 if let Err(e) = agent_cmd_tx.send(cmd).await {
                     error!("Failed to send agent command from cron: {}", e);

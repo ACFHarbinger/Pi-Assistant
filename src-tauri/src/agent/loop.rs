@@ -19,6 +19,7 @@ use uuid::Uuid;
 #[derive(Clone, Debug)]
 pub struct AgentTask {
     pub id: Uuid,
+    pub agent_id: Uuid,
     pub description: String,
     pub max_iterations: u32,
     pub session_id: Uuid,
@@ -89,6 +90,7 @@ pub fn spawn_agent_loop(
             Err(e) => {
                 warn!(task_id = %task.id, error = %e, "Agent loop failed");
                 let _ = state_tx.send(AgentState::Stopped {
+                    agent_id: task.agent_id,
                     task_id: task.id,
                     reason: pi_core::agent_types::StopReason::Error(e.to_string()),
                 });
@@ -122,6 +124,7 @@ async fn agent_loop(
         // ── Check cancellation ───────────────────────────────────────
         if cancel_token.is_cancelled() {
             let _ = state_tx.send(AgentState::Stopped {
+                agent_id: task.agent_id,
                 task_id: task.id,
                 reason: StopReason::ManualStop,
             });
@@ -131,6 +134,7 @@ async fn agent_loop(
         // ── Check iteration limit ────────────────────────────────────
         if iteration >= task.max_iterations {
             let _ = state_tx.send(AgentState::Stopped {
+                agent_id: task.agent_id,
                 task_id: task.id,
                 reason: StopReason::IterationLimit,
             });
@@ -139,6 +143,7 @@ async fn agent_loop(
 
         // ── Broadcast current iteration ──────────────────────────────
         let _ = state_tx.send(AgentState::Running {
+            agent_id: task.agent_id,
             task_id: task.id,
             iteration,
             task_tree: task_manager.get_tree(),
@@ -150,15 +155,17 @@ async fn agent_loop(
         // ── Check for incoming commands (non-blocking) ───────────────
         while let Ok(cmd) = cmd_rx.try_recv() {
             match cmd {
-                AgentCommand::Stop => {
+                AgentCommand::Stop { .. } => {
                     let _ = state_tx.send(AgentState::Stopped {
+                        agent_id: task.agent_id,
                         task_id: task.id,
                         reason: StopReason::ManualStop,
                     });
                     return Ok(StopReason::ManualStop);
                 }
-                AgentCommand::Pause => {
+                AgentCommand::Pause { .. } => {
                     let _ = state_tx.send(AgentState::Paused {
+                        agent_id: task.agent_id,
                         task_id: task.id,
                         question: None,
                         awaiting_permission: None,
@@ -168,9 +175,10 @@ async fn agent_loop(
                     loop {
                         let cmd = cmd_rx.recv().await;
                         match cmd {
-                            Some(AgentCommand::Resume) => break,
-                            Some(AgentCommand::Stop) => {
+                            Some(AgentCommand::Resume { .. }) => break,
+                            Some(AgentCommand::Stop { .. }) => {
                                 let _ = state_tx.send(AgentState::Stopped {
+                                    agent_id: task.agent_id,
                                     task_id: task.id,
                                     reason: StopReason::ManualStop,
                                 });
@@ -181,6 +189,7 @@ async fn agent_loop(
                     }
 
                     let _ = state_tx.send(AgentState::Running {
+                        agent_id: task.agent_id,
                         task_id: task.id,
                         iteration,
                         task_tree: task_manager.get_tree(),
@@ -210,6 +219,7 @@ async fn agent_loop(
         if let Err(e) = resources.cost_manager.lock().await.check_budget() {
             warn!(task_id = %task.id, error = %e, "Budget exceeded");
             let _ = state_tx.send(AgentState::Stopped {
+                agent_id: task.agent_id,
                 task_id: task.id,
                 reason: StopReason::Error(e.to_string()),
             });
@@ -264,6 +274,7 @@ async fn agent_loop(
         // ── 3. Human-in-the-loop: agent asks a question ─────────────
         if let Some(ref question) = plan.question {
             let _ = state_tx.send(AgentState::Paused {
+                agent_id: task.agent_id,
                 task_id: task.id,
                 question: Some(question.clone()),
                 awaiting_permission: None,
@@ -276,6 +287,7 @@ async fn agent_loop(
                 .await?;
 
             let _ = state_tx.send(AgentState::Running {
+                agent_id: task.agent_id,
                 task_id: task.id,
                 iteration,
                 task_tree: task_manager.get_tree(),
@@ -301,6 +313,7 @@ async fn agent_loop(
                     };
 
                     let _ = state_tx.send(AgentState::Paused {
+                        agent_id: task.agent_id,
                         task_id: task.id,
                         question: None,
                         awaiting_permission: Some(req.clone()),
@@ -318,6 +331,7 @@ async fn agent_loop(
                     }
 
                     let _ = state_tx.send(AgentState::Running {
+                        agent_id: task.agent_id,
                         task_id: task.id,
                         iteration,
                         task_tree: task_manager.get_tree(),
@@ -435,6 +449,7 @@ async fn agent_loop(
 
                     if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
                         let _ = state_tx.send(AgentState::Paused {
+                            agent_id: task.agent_id,
                             task_id: task.id,
                             question: Some(format!(
                                 "I've encountered {} consecutive errors. The last error was: {}. Should I continue?",
@@ -461,6 +476,7 @@ async fn agent_loop(
         if plan.is_complete {
             info!(task_id = %task.id, iterations = iteration, "Task completed");
             let _ = state_tx.send(AgentState::Stopped {
+                agent_id: task.agent_id,
                 task_id: task.id,
                 reason: StopReason::Completed,
             });
@@ -483,9 +499,9 @@ async fn wait_for_answer(
             }
             cmd = cmd_rx.recv() => {
                 match cmd {
-                    Some(AgentCommand::AnswerQuestion { response }) => return Ok(response),
+                    Some(AgentCommand::AnswerQuestion { response, .. }) => return Ok(response),
                     Some(AgentCommand::ChannelMessage { text, .. }) => return Ok(text),
-                    Some(AgentCommand::Stop) => anyhow::bail!("Stopped by user"),
+                    Some(AgentCommand::Stop { .. }) => anyhow::bail!("Stopped by user"),
                     None => anyhow::bail!("Command channel closed"),
                     _ => continue,
                 }
@@ -510,7 +526,7 @@ async fn wait_for_permission(
                     Some(AgentCommand::ApprovePermission { approved, remember, .. }) => {
                         return Ok((approved, remember));
                     }
-                    Some(AgentCommand::Stop) => anyhow::bail!("Stopped by user"),
+                    Some(AgentCommand::Stop { .. }) => anyhow::bail!("Stopped by user"),
                     None => anyhow::bail!("Command channel closed"),
                     _ => continue,
                 }

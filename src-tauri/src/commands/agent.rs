@@ -30,10 +30,16 @@ pub async fn start_agent(
 
 /// Stop the running agent.
 #[tauri::command]
-pub async fn stop_agent(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn stop_agent(
+    state: State<'_, AppState>,
+    agent_id: Option<String>,
+) -> Result<(), String> {
+    let id = agent_id
+        .map(|s| uuid::Uuid::parse_str(&s).map_err(|e| e.to_string()))
+        .transpose()?;
     state
         .agent_cmd_tx
-        .send(AgentCommand::Stop)
+        .send(AgentCommand::Stop { agent_id: id })
         .await
         .map_err(|e| format!("Failed to send stop command: {}", e))?;
     Ok(())
@@ -41,10 +47,16 @@ pub async fn stop_agent(state: State<'_, AppState>) -> Result<(), String> {
 
 /// Pause the running agent.
 #[tauri::command]
-pub async fn pause_agent(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn pause_agent(
+    state: State<'_, AppState>,
+    agent_id: Option<String>,
+) -> Result<(), String> {
+    let id = agent_id
+        .map(|s| uuid::Uuid::parse_str(&s).map_err(|e| e.to_string()))
+        .transpose()?;
     state
         .agent_cmd_tx
-        .send(AgentCommand::Pause)
+        .send(AgentCommand::Pause { agent_id: id })
         .await
         .map_err(|e| format!("Failed to send pause command: {}", e))?;
     Ok(())
@@ -52,10 +64,16 @@ pub async fn pause_agent(state: State<'_, AppState>) -> Result<(), String> {
 
 /// Resume a paused agent.
 #[tauri::command]
-pub async fn resume_agent(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn resume_agent(
+    state: State<'_, AppState>,
+    agent_id: Option<String>,
+) -> Result<(), String> {
+    let id = agent_id
+        .map(|s| uuid::Uuid::parse_str(&s).map_err(|e| e.to_string()))
+        .transpose()?;
     state
         .agent_cmd_tx
-        .send(AgentCommand::Resume)
+        .send(AgentCommand::Resume { agent_id: id })
         .await
         .map_err(|e| format!("Failed to send resume command: {}", e))?;
     Ok(())
@@ -63,10 +81,20 @@ pub async fn resume_agent(state: State<'_, AppState>) -> Result<(), String> {
 
 /// Answer a question from the agent.
 #[tauri::command]
-pub async fn answer_question(state: State<'_, AppState>, answer: String) -> Result<(), String> {
+pub async fn answer_question(
+    state: State<'_, AppState>,
+    answer: String,
+    agent_id: Option<String>,
+) -> Result<(), String> {
+    let id = agent_id
+        .map(|s| uuid::Uuid::parse_str(&s).map_err(|e| e.to_string()))
+        .transpose()?;
     state
         .agent_cmd_tx
-        .send(AgentCommand::AnswerQuestion { response: answer })
+        .send(AgentCommand::AnswerQuestion {
+            agent_id: id,
+            response: answer,
+        })
         .await
         .map_err(|e| format!("Failed to send answer: {}", e))?;
     Ok(())

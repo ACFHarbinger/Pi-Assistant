@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `DeployedModelTool` (Rust) — dynamic `Tool` wrapper for each deployed model, auto-registered in `ToolRegistry`
   - `TrainingTool` extended with `deploy`, `predict`, `list_deployed` actions
   - GPU memory cleanup after training completes (`gc.collect()` + `torch.cuda.empty_cache()`)
+- **Cost-Aware Planning** — Track and limit token usage per session.
+  - `CostManager` tracks prompt/completion tokens and estimates costs.
+  - User-configurable limits for Max Tokens and Max Cost in Settings.
+  - `CostDashboard` component for real-time monitoring.
+  - Backend integration in `AgentCommand::Start` to enforce budgets.
 - Project architecture design and documentation
 - File structure for Rust (Tauri v2), React/TypeScript, Python sidecar, and Android client
 - Agent loop design with state machine (Idle/Running/Paused/Stopped)

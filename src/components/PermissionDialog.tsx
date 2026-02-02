@@ -10,7 +10,11 @@ interface PermissionRequest {
 }
 
 export function PermissionDialog() {
-  const { state } = useAgentStore();
+  const { agents, activeAgentId } = useAgentStore();
+  const state = (activeAgentId ? agents[activeAgentId] : undefined) || {
+    status: "Idle",
+    data: {},
+  };
 
   // Check if we're in paused state with a permission request
   if (state.status !== "Paused" || !state.data?.awaiting_permission) {

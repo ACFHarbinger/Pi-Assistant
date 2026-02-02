@@ -27,7 +27,7 @@ After each tool execution, add an explicit reflection step where the agent evalu
 - Maintain a per-task error budget: after N consecutive failures, pause and ask the user
 - Log reflection reasoning alongside tool results for transparency
 
-### 1.3 Cost-Aware Planning
+### 1.3 Cost-Aware Planning [IMPLEMENTED]
 
 When multiple LLM providers are available (local models, Anthropic API, OpenAI API), the planner should consider the cost and latency tradeoff for each planning step. Simple decisions (file reads, directory listings) can use a small local model. Complex reasoning (architecture decisions, debugging) can escalate to a larger cloud model.
 

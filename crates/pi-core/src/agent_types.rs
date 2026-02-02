@@ -15,6 +15,7 @@ pub enum AgentState {
     #[default]
     Idle,
     Running {
+        agent_id: Uuid,
         task_id: Uuid,
         iteration: u32,
         #[serde(default)]
@@ -27,15 +28,18 @@ pub enum AgentState {
         cost_stats: Option<TokenUsage>,
     },
     Paused {
+        agent_id: Uuid,
         task_id: Uuid,
         question: Option<String>,
         awaiting_permission: Option<PermissionRequest>,
     },
     Stopped {
+        agent_id: Uuid,
         task_id: Uuid,
         reason: StopReason,
     },
     AssistantMessage {
+        agent_id: Uuid,
         content: String,
         #[serde(default)]
         is_streaming: bool,
@@ -97,18 +101,27 @@ pub enum AgentCommand {
         #[serde(default)]
         cost_config: Option<CostConfig>,
     },
-    Stop,
-    Pause,
-    Resume,
+    Stop {
+        agent_id: Option<Uuid>,
+    },
+    Pause {
+        agent_id: Option<Uuid>,
+    },
+    Resume {
+        agent_id: Option<Uuid>,
+    },
     AnswerQuestion {
+        agent_id: Option<Uuid>,
         response: String,
     },
     ApprovePermission {
+        agent_id: Option<Uuid>,
         request_id: Uuid,
         approved: bool,
         remember: bool,
     },
     ChatMessage {
+        agent_id: Option<Uuid>,
         content: String,
         provider: Option<String>,
         model_id: Option<String>,

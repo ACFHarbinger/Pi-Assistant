@@ -87,6 +87,7 @@ pub async fn push_to_talk_stop(state: State<'_, AppState>) -> Result<String, Str
             content: transcription.clone(),
             provider: None,
             model_id: None,
+            agent_id: None,
         })
         .await
         .map_err(|e| e.to_string())?;

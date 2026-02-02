@@ -172,15 +172,18 @@ async fn handle_client_message(
                     model_id: None,
                     cost_config: None,
                 },
-                ClientCommand::Stop => AgentCommand::Stop,
-                ClientCommand::Pause => AgentCommand::Pause,
-                ClientCommand::Resume => AgentCommand::Resume,
+                ClientCommand::Stop => AgentCommand::Stop { agent_id: None },
+                ClientCommand::Pause => AgentCommand::Pause { agent_id: None },
+                ClientCommand::Resume => AgentCommand::Resume { agent_id: None },
             };
             cmd_tx.send(agent_cmd).await?;
         }
         WsClientMessage::Answer { response } => {
             cmd_tx
-                .send(AgentCommand::AnswerQuestion { response })
+                .send(AgentCommand::AnswerQuestion {
+                    response,
+                    agent_id: None,
+                })
                 .await?;
         }
         WsClientMessage::PermissionResponse {
@@ -193,6 +196,7 @@ async fn handle_client_message(
                     request_id,
                     approved,
                     remember,
+                    agent_id: None,
                 })
                 .await?;
         }

@@ -158,6 +158,7 @@ impl VoiceManager {
                                     content: "Hey Pi".to_string(),
                                     provider: None,
                                     model_id: None,
+                                    agent_id: None,
                                 })
                                 .await;
                         }

@@ -178,6 +178,7 @@ async fn webhook_handler(
             content: payload.task,
             provider: payload.provider,
             model_id: payload.model_id,
+            agent_id: None,
         }
     } else {
         AgentCommand::Start {

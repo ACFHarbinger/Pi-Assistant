@@ -21,9 +21,10 @@ interface PermissionRequest {
   description: string;
 }
 
-interface AgentState {
+export interface AgentState {
   status: "Idle" | "Running" | "Paused" | "Stopped" | "AssistantMessage";
   data?: {
+    agent_id?: string;
     task_id?: string;
     iteration?: number;
     task_tree?: Subtask[];
@@ -51,7 +52,8 @@ interface Message {
 }
 
 interface AgentStore {
-  state: AgentState;
+  agents: Record<string, AgentState>;
+  activeAgentId: string | null;
   messages: Message[];
   isLoading: boolean;
   error: string | null;
@@ -63,11 +65,12 @@ interface AgentStore {
 
   // Actions
   startAgent: (task: string) => Promise<void>;
-  stopAgent: () => Promise<void>;
-  pauseAgent: () => Promise<void>;
-  resumeAgent: () => Promise<void>;
-  sendMessage: (content: string) => Promise<void>;
-  sendAnswer: (content: string) => Promise<void>;
+  stopAgent: (agentId?: string) => Promise<void>;
+  pauseAgent: (agentId?: string) => Promise<void>;
+  resumeAgent: (agentId?: string) => Promise<void>;
+  sendMessage: (content: string, agentId?: string) => Promise<void>;
+  sendAnswer: (content: string, agentId?: string) => Promise<void>;
+  setActiveAgent: (agentId: string) => void;
   refreshState: () => Promise<void>;
   addMessage: (role: Message["role"], content: string) => void;
   clearError: () => void;
@@ -105,7 +108,8 @@ interface AgentStore {
 export const useAgentStore = create<AgentStore>((set, get) => {
   // Initial state and basic properties
   const initialState = {
-    state: { status: "Idle" as const },
+    agents: {},
+    activeAgentId: null,
     messages: [],
     isLoading: false,
     error: null,
@@ -145,12 +149,14 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       }
     },
 
-    stopAgent: async () => {
+    setActiveAgent: (agentId: string) => set({ activeAgentId: agentId }),
+
+    stopAgent: async (agentId?: string) => {
       set({ isLoading: true, error: null });
+      const targetId = agentId || get().activeAgentId;
       try {
-        await invoke("stop_agent");
+        await invoke("stop_agent", { agentId: targetId });
         get().addMessage("system", "Agent stopped");
-        await get().refreshState();
       } catch (e) {
         set({ error: String(e) });
       } finally {
@@ -158,47 +164,51 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       }
     },
 
-    pauseAgent: async () => {
+    pauseAgent: async (agentId?: string) => {
+      const targetId = agentId || get().activeAgentId;
       try {
-        await invoke("pause_agent");
-        await get().refreshState();
+        await invoke("pause_agent", { agentId: targetId });
       } catch (e) {
         set({ error: String(e) });
       }
     },
 
-    resumeAgent: async () => {
+    resumeAgent: async (agentId?: string) => {
+      const targetId = agentId || get().activeAgentId;
       try {
-        await invoke("resume_agent");
-        await get().refreshState();
+        await invoke("resume_agent", { agentId: targetId });
       } catch (e) {
         set({ error: String(e) });
       }
     },
 
-    sendMessage: async (content: string) => {
+    sendMessage: async (content: string, agentId?: string) => {
       // Optimistic update
       get().addMessage("user", content);
 
       const { selectedProvider, selectedModel } = get();
+      const targetId = agentId || get().activeAgentId;
       try {
         await invoke("send_message", {
           message: content,
           provider: selectedProvider || null,
           model_id: selectedModel || null,
+          agentId: targetId,
         });
       } catch (e) {
         set({ error: String(e) });
       }
     },
 
-    sendAnswer: async (content: string) => {
+    sendAnswer: async (content: string, agentId?: string) => {
       // Optimistic update
       get().addMessage("user", content);
 
+      const targetId = agentId || get().activeAgentId;
       try {
         await invoke("answer_question", {
           answer: content,
+          agentId: targetId,
         });
       } catch (e) {
         set({ error: String(e) });
@@ -295,8 +305,8 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
     refreshState: async () => {
       try {
-        const state = await invoke<AgentState>("get_agent_state");
-        set({ state });
+        // Backend `get_agent_state` might be legacy single-agent.
+        // For now, we rely on events.
       } catch (e) {
         console.error("Failed to refresh state:", e);
       }
@@ -329,6 +339,7 @@ export const useAgentStore = create<AgentStore>((set, get) => {
           if (newState.status === "AssistantMessage") {
             const content = newState.data?.content;
             const isStreaming = newState.data?.is_streaming;
+            // const agentId = newState.data?.agent_id;
 
             if (content) {
               const { messages } = get();
@@ -350,7 +361,16 @@ export const useAgentStore = create<AgentStore>((set, get) => {
             return;
           }
 
-          set({ state: newState });
+          // Handle other states
+          const agentId = newState.data?.agent_id;
+          if (agentId) {
+            set((s) => {
+              const newAgents = { ...s.agents, [agentId]: newState };
+              // Auto-select if no active agent
+              const activeId = s.activeAgentId || agentId;
+              return { agents: newAgents, activeAgentId: activeId };
+            });
+          }
         },
       );
       return unlisten;

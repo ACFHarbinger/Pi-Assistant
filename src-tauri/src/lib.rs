@@ -43,7 +43,7 @@ pub fn run() {
                 let chat_session_id = state.chat_session_id.clone();
 
                 tauri::async_runtime::spawn(async move {
-                    agent::spawn_agent_monitor(
+                    agent::spawn_agent_coordinator(
                         agent_state_tx,
                         agent_cmd_rx,
                         tool_registry,

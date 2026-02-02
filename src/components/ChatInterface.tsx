@@ -4,7 +4,8 @@ import { useAgentStore } from "../stores/agentStore";
 export function ChatInterface() {
   const {
     messages,
-    state,
+    agents,
+    activeAgentId,
     sendMessage,
     availableModels,
     selectedModel,
@@ -14,6 +15,11 @@ export function ChatInterface() {
     setSelectedProvider,
     sendAnswer,
   } = useAgentStore();
+
+  const state = (activeAgentId ? agents[activeAgentId] : undefined) || {
+    status: "Idle",
+    data: {},
+  };
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

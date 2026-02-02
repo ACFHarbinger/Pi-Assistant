@@ -2,6 +2,7 @@ import { useAgentStore } from "./stores/agentStore";
 import { AgentStatus } from "./components/AgentStatus";
 import { ChatInterface } from "./components/ChatInterface.tsx";
 import { TaskInput } from "./components/TaskInput.tsx";
+import { AgentSelector } from "./components/AgentSelector.tsx";
 import { PermissionDialog } from "./components/PermissionDialog.tsx";
 import { HatchingExperience } from "./components/HatchingExperience.tsx";
 import { VoicePanel } from "./components/VoicePanel";
@@ -13,10 +14,16 @@ import { useState, useEffect } from "react";
 import init, { init_panic_hook } from "./wasm/pi-core/pi_core";
 
 function App() {
-  const { state, setupListeners } = useAgentStore();
+  const { agents, activeAgentId, setupListeners } = useAgentStore();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [isHatched, setIsHatched] = useState<boolean | null>(null);
+
+  // Derive active state
+  const state =
+    activeAgentId && agents[activeAgentId]
+      ? agents[activeAgentId]
+      : { status: "Idle" as const };
 
   // Initialize listeners and Wasm
   useEffect(() => {
@@ -47,7 +54,11 @@ function App() {
     setIsHatched(hatched);
   }, []);
 
-  console.log("App: Current state:", { status: state.status, isHatched });
+  console.log("App: Current state:", {
+    status: state.status,
+    isHatched,
+    activeAgentId,
+  });
 
   // Show hatching experience if not yet hatched
   if (isHatched === null) {
@@ -79,7 +90,7 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <AgentStatus />
+            <AgentStatus state={state} />
             <button
               onClick={() => setIsCanvasOpen(!isCanvasOpen)}
               className={`p-2 transition-colors ${isCanvasOpen ? "text-primary-400" : "text-gray-400 hover:text-white"}`}
@@ -96,6 +107,7 @@ function App() {
             </button>
           </div>
         </div>
+        <AgentSelector />
       </header>
 
       {/* Main Content */}
