@@ -11,11 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rollback & Undo System** — added safety layer for reversing agent actions
+  - `TransactionManager` tracks all file modifications and shell commands in a transaction log
+  - `undo` command reverses the most recent tool execution (restores files, cleans up)
+  - Atomic file writes with automatic backups (`.bak` files)
+  - `CodeTool` integrated with `TransactionManager` for safe writes
+- **API Tool Enhancements** — Added OpenAPI Ingestion support to `ApiTool`.
+  - Parses JSON/YAML OpenAPI specs and extracts endpoints/schemas.
+  - Allows the agent to learn API structures dynamically.
+- **Tool System Refactor** — Refactored the `Tool` trait and implementation.
+  - Standardized `execute` signature to include `ToolContext`.
+  - Enables tools to access shared resources like `TransactionManager`.
 - **Heterogeneous Device Awareness** — `DeviceManager` module probes CPU, GPU (CUDA/MPS), and RAM at startup; exposes hardware info to the LLM planner so it can make device-aware decisions
   - `device.info` and `device.refresh` IPC handlers
   - `get_device_info`, `refresh_device_memory` Tauri commands
   - `deviceStore.ts` Zustand store for frontend device info
   - Device capabilities injected into agent planner context (`loop.rs`)
+- **Domain Adaptation Support** — implemented utilities for distribution shift and transfer learning
+  - `MMDLoss` for Maximum Mean Discrepancy based alignment
+  - `GradientReversalLayer` and `DomainDiscriminator` for Adversarial Training (DANN)
+  - Integration into `PiLightningModule` and `TrainingOrchestrator`
+- **Continual Learning Utilities** — added strategies to prevent catastrophic forgetting
+  - `EWCCallback` for Elastic Weight Consolidation
+  - `ReplayBuffer` and `ReplayDataset` for Experience Replay
 - **GPU ↔ CPU Live Migration** — models can be moved between CPU and GPU at runtime without restarting the sidecar
   - `ModelRegistry.migrate_model()` handles both transformers (`.to(device)`) and llama.cpp (reload with different `n_gpu_layers`)
   - `model.migrate` IPC handler and `migrate_model` Tauri command

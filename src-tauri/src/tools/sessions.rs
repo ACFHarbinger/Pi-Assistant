@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::agent::pool::AgentPool;
-use crate::tools::{PermissionTier, Tool, ToolResult};
+use crate::tools::{PermissionTier, Tool, ToolContext, ToolResult};
 
 /// Tool for managing agent sessions.
 pub struct SessionTool {
@@ -62,7 +62,7 @@ impl Tool for SessionTool {
         })
     }
 
-    async fn execute(&self, params: Value) -> anyhow::Result<ToolResult> {
+    async fn execute(&self, params: Value, _context: ToolContext) -> anyhow::Result<ToolResult> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())

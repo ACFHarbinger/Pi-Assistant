@@ -64,6 +64,7 @@ impl PermissionEngine {
         match call.tool_name.as_str() {
             "shell" => self.check_shell_command(call),
             "code" => self.check_code_operation(call),
+            "database" => self.check_database_operation(call),
             "browser" => Ok(PermissionResult::NeedsApproval),
             _ => Ok(PermissionResult::NeedsApproval),
         }
@@ -116,6 +117,41 @@ impl PermissionEngine {
         }
 
         Ok(PermissionResult::NeedsApproval)
+    }
+
+    fn check_database_operation(&self, call: &ToolCall) -> Result<PermissionResult> {
+        let action = call
+            .parameters
+            .get("action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        // Read-only actions are auto-approved
+        match action {
+            "connect" | "schema" | "explain" | "list_tables" | "disconnect" => {
+                Ok(PermissionResult::Allowed)
+            }
+            "query" => {
+                let sql = call
+                    .parameters
+                    .get("sql")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let trimmed = sql.trim().to_uppercase();
+                // Auto-approve read-only queries
+                if trimmed.starts_with("SELECT")
+                    || trimmed.starts_with("PRAGMA")
+                    || trimmed.starts_with("EXPLAIN")
+                    || trimmed.starts_with("WITH")
+                {
+                    Ok(PermissionResult::Allowed)
+                } else {
+                    // Write operations need approval
+                    Ok(PermissionResult::NeedsApproval)
+                }
+            }
+            _ => Ok(PermissionResult::NeedsApproval),
+        }
     }
 
     /// Add a user override for a pattern.

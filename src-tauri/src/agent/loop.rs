@@ -1,5 +1,6 @@
 //! Core agent loop: plan-execute-observe cycle.
 
+use crate::agent::transaction::TransactionManager;
 use crate::ipc::SidecarHandle;
 use crate::memory::MemoryManager;
 use crate::safety::{PermissionEngine, PermissionResult};
@@ -54,6 +55,7 @@ pub struct AgentResources {
     pub ml_sidecar: Arc<Mutex<SidecarHandle>>,
     pub permission_engine: Arc<Mutex<PermissionEngine>>,
     pub cost_manager: Arc<Mutex<crate::agent::cost::CostManager>>,
+    pub transactions: Arc<Mutex<TransactionManager>>,
 }
 
 /// Spawn the agent loop as a background Tokio task.
@@ -72,6 +74,7 @@ pub fn spawn_agent_loop(
     let cost_manager = Arc::new(Mutex::new(crate::agent::cost::CostManager::new(
         task.cost_config.clone(),
     )));
+    let transactions = Arc::new(Mutex::new(TransactionManager::new()));
 
     let resources = AgentResources {
         tool_registry,
@@ -79,6 +82,7 @@ pub fn spawn_agent_loop(
         ml_sidecar,
         permission_engine,
         cost_manager,
+        transactions,
     };
 
     let join_handle = tokio::spawn(async move {
@@ -140,6 +144,9 @@ async fn agent_loop(
             });
             return Ok(StopReason::IterationLimit);
         }
+
+        // ── Start transaction ──────────────────────────────────────
+        resources.transactions.lock().await.start_transaction();
 
         // ── Broadcast current iteration ──────────────────────────────
         let _ = state_tx.send(AgentState::Running {
@@ -420,16 +427,21 @@ async fn agent_loop(
                 .get(&tool_call.tool_name)
                 .ok_or_else(|| anyhow::anyhow!("Unknown tool: {}", tool_call.tool_name))?
                 .clone();
-            // Execute tool
-            let result = tool.execute(tool_call.parameters.clone()).await;
+            // Execute tool with timing
+            let exec_start = std::time::Instant::now();
+            let context = crate::tools::ToolContext {
+                transactions: Some(resources.transactions.clone()),
+            };
+            let result = tool.execute(tool_call.parameters.clone(), context).await;
+            let duration_ms = exec_start.elapsed().as_millis() as u64;
 
             // Handle result and error budget
-            let result_str = match result {
+            let _result_str = match result {
                 Ok(res) => {
                     consecutive_errors = 0; // Reset on success
                     resources
                         .memory
-                        .store_tool_result(&task.id, tool_call, &res)
+                        .store_tool_result(&task.id, tool_call, &res, Some(duration_ms))
                         .await?;
                     res.output
                 }
@@ -444,6 +456,7 @@ async fn agent_loop(
                             &task.id,
                             tool_call,
                             &crate::tools::ToolResult::error(&error_msg),
+                            Some(duration_ms),
                         )
                         .await?;
 

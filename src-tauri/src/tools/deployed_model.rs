@@ -1,5 +1,5 @@
 use crate::ipc::SidecarHandle;
-use crate::tools::{PermissionTier, Tool, ToolResult};
+use crate::tools::{PermissionTier, Tool, ToolContext, ToolResult};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::json;
@@ -64,7 +64,11 @@ impl Tool for DeployedModelTool {
         })
     }
 
-    async fn execute(&self, params: serde_json::Value) -> Result<ToolResult> {
+    async fn execute(
+        &self,
+        params: serde_json::Value,
+        _context: ToolContext,
+    ) -> Result<ToolResult> {
         let input = &params["input"];
         if input.is_null() {
             return Ok(ToolResult::error("Missing 'input' parameter"));

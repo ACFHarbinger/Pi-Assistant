@@ -1,6 +1,6 @@
 //! Browser tool: headless Chrome automation via chromiumoxide.
 
-use super::{PermissionTier, Tool, ToolResult};
+use super::{PermissionTier, Tool, ToolContext, ToolResult};
 use anyhow::Result;
 use async_trait::async_trait;
 use base64::Engine;
@@ -207,7 +207,11 @@ impl Tool for BrowserTool {
         })
     }
 
-    async fn execute(&self, params: serde_json::Value) -> Result<ToolResult> {
+    async fn execute(
+        &self,
+        params: serde_json::Value,
+        _context: ToolContext,
+    ) -> Result<ToolResult> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())

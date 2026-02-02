@@ -66,6 +66,12 @@ pub fn run() {
                     );
                     let mut registry = state.tool_registry.write().await;
                     registry.register_canvas_tool(app.handle().clone(), canvas_state.clone());
+                    registry.register(std::sync::Arc::new(
+                        crate::tools::diagram::DiagramTool::new(
+                            app.handle().clone(),
+                            canvas_state.clone(),
+                        ),
+                    ));
 
                     // Restore canvas state if persisted
                     let app_handle = app.handle().clone();
@@ -146,6 +152,7 @@ pub fn run() {
             commands::agent::resume_agent,
             commands::agent::answer_question,
             commands::agent::get_agent_state,
+            commands::agent::get_execution_timeline,
             commands::chat::send_message,
             commands::chat::get_history,
             commands::config::get_mcp_config,

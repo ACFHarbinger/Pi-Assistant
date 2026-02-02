@@ -1,10 +1,13 @@
 //! Tool system: registry, trait, and implementations.
 
+pub mod api;
 pub mod browser;
 pub mod canvas;
 pub mod code;
 pub mod cron;
+pub mod database;
 pub mod deployed_model;
+pub mod diagram;
 pub mod sessions;
 pub mod shell;
 pub mod training;
@@ -28,6 +31,22 @@ pub struct ToolResult {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<serde_json::Value>,
+}
+
+/// Context passed to tools during execution.
+#[derive(Clone)]
+pub struct ToolContext {
+    pub transactions: Option<Arc<Mutex<crate::agent::transaction::TransactionManager>>>,
+}
+
+/// Trait for an action that can be rolled back.
+#[async_trait]
+pub trait UndoableAction: Send + Sync {
+    /// Human-readable description of the action.
+    fn description(&self) -> &str;
+
+    /// Roll back the action.
+    async fn rollback(&self) -> Result<()>;
 }
 
 impl ToolResult {
@@ -80,7 +99,7 @@ pub trait Tool: Send + Sync {
     fn parameters_schema(&self) -> serde_json::Value;
 
     /// Execute the tool with given parameters.
-    async fn execute(&self, params: serde_json::Value) -> Result<ToolResult>;
+    async fn execute(&self, params: serde_json::Value, context: ToolContext) -> Result<ToolResult>;
 
     /// Permission tier for this tool.
     fn permission_tier(&self) -> PermissionTier;
@@ -109,6 +128,8 @@ impl ToolRegistry {
         registry.register(Arc::new(shell::ShellTool::new()));
         registry.register(Arc::new(code::CodeTool::new()));
         registry.register(Arc::new(cron::CronTool::new(cron_manager)));
+        registry.register(Arc::new(database::DatabaseTool::new()));
+        registry.register(Arc::new(api::ApiTool::new()));
 
         registry
     }
@@ -133,13 +154,13 @@ impl ToolRegistry {
     }
 
     /// Execute a tool call.
-    pub async fn execute(&self, call: &ToolCall) -> Result<ToolResult> {
+    pub async fn execute(&self, call: &ToolCall, context: ToolContext) -> Result<ToolResult> {
         let tool = self
             .tools
             .get(&call.tool_name)
             .ok_or_else(|| anyhow::anyhow!("Unknown tool: {}", call.tool_name))?;
 
-        tool.execute(call.parameters.clone()).await
+        tool.execute(call.parameters.clone(), context).await
     }
 
     /// List all tools with their schemas.
@@ -214,7 +235,11 @@ mod tests {
         fn permission_tier(&self) -> PermissionTier {
             PermissionTier::Low
         }
-        async fn execute(&self, _params: serde_json::Value) -> Result<ToolResult> {
+        async fn execute(
+            &self,
+            _params: serde_json::Value,
+            _context: ToolContext,
+        ) -> Result<ToolResult> {
             Ok(ToolResult::success("mock executed"))
         }
     }
@@ -253,7 +278,10 @@ mod tests {
             parameters: json!({}),
         };
 
-        let result = registry.execute(&call).await.unwrap();
+        let result = registry
+            .execute(&call, ToolContext { transactions: None })
+            .await
+            .unwrap();
         assert!(result.success);
         assert_eq!(result.output, "mock executed");
     }

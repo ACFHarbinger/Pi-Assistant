@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::RwLock;
 
-use crate::tools::{PermissionTier, Tool, ToolResult};
+use crate::tools::{PermissionTier, Tool, ToolContext, ToolResult};
 
 /// Manages canvas state persistence.
 pub struct CanvasStateManager {
@@ -116,7 +116,7 @@ impl Tool for CanvasTool {
         })
     }
 
-    async fn execute(&self, params: Value) -> anyhow::Result<ToolResult> {
+    async fn execute(&self, params: Value, _context: ToolContext) -> anyhow::Result<ToolResult> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())

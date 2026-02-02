@@ -1,6 +1,6 @@
 use crate::ipc::SidecarHandle;
 use crate::tools::deployed_model::DeployedModelTool;
-use crate::tools::{PermissionTier, Tool, ToolRegistry, ToolResult};
+use crate::tools::{PermissionTier, Tool, ToolContext, ToolRegistry, ToolResult};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::json;
@@ -71,7 +71,11 @@ impl Tool for TrainingTool {
         })
     }
 
-    async fn execute(&self, params: serde_json::Value) -> Result<ToolResult> {
+    async fn execute(
+        &self,
+        params: serde_json::Value,
+        _context: ToolContext,
+    ) -> Result<ToolResult> {
         let action = params["action"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing action"))?;

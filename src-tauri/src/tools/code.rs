@@ -1,6 +1,6 @@
 //! Code tool: file read/write/patch operations.
 
-use super::{PermissionTier, Tool, ToolResult};
+use super::{PermissionTier, Tool, ToolContext, ToolResult};
 use anyhow::Result;
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
@@ -90,7 +90,11 @@ impl Tool for CodeTool {
         })
     }
 
-    async fn execute(&self, params: serde_json::Value) -> Result<ToolResult> {
+    async fn execute(
+        &self,
+        params: serde_json::Value,
+        _context: ToolContext,
+    ) -> Result<ToolResult> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())

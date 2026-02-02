@@ -105,3 +105,16 @@ pub async fn answer_question(
 pub fn get_agent_state(state: State<'_, AppState>) -> AgentState {
     state.agent_state_rx.borrow().clone()
 }
+
+/// Get the execution timeline for a task.
+#[tauri::command]
+pub fn get_execution_timeline(
+    state: State<'_, AppState>,
+    task_id: String,
+) -> Result<Vec<serde_json::Value>, String> {
+    let uuid = uuid::Uuid::parse_str(&task_id).map_err(|e| e.to_string())?;
+    state
+        .memory
+        .get_execution_timeline(&uuid)
+        .map_err(|e| e.to_string())
+}

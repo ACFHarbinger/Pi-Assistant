@@ -124,6 +124,21 @@ impl MemoryManager {
         "#,
         )?;
 
+        // Migration: add duration_ms column to tool_executions if not present
+        let has_duration: bool = conn
+            .prepare("SELECT COUNT(*) FROM pragma_table_info('tool_executions') WHERE name='duration_ms'")?
+            .query_row([], |row| row.get::<_, i64>(0))
+            .unwrap_or(0)
+            > 0;
+
+        if !has_duration {
+            conn.execute(
+                "ALTER TABLE tool_executions ADD COLUMN duration_ms INTEGER DEFAULT NULL",
+                [],
+            )?;
+            info!("Migration: added duration_ms column to tool_executions");
+        }
+
         info!("Database schema initialized");
         Ok(())
     }
@@ -235,12 +250,13 @@ impl MemoryManager {
         task_id: &Uuid,
         call: &ToolCall,
         result: &ToolResult,
+        duration_ms: Option<u64>,
     ) -> Result<Uuid> {
         let id = Uuid::new_v4();
         let conn = self.conn.lock().unwrap();
 
         conn.execute(
-            "INSERT INTO tool_executions (id, task_id, tool_name, parameters, result_success, result_output, result_error) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO tool_executions (id, task_id, tool_name, parameters, result_success, result_output, result_error, duration_ms) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 id.to_string(),
                 task_id.to_string(),
@@ -249,6 +265,7 @@ impl MemoryManager {
                 result.success as i32,
                 result.output,
                 result.error,
+                duration_ms.map(|d| d as i64),
             ],
         )?;
 
@@ -295,6 +312,34 @@ impl MemoryManager {
                 })
             })
             .collect())
+    }
+
+    /// Retrieve the execution timeline for a task.
+    pub fn get_execution_timeline(&self, task_id: &Uuid) -> Result<Vec<serde_json::Value>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, tool_name, parameters, result_success, result_output, result_error, duration_ms, created_at
+             FROM tool_executions
+             WHERE task_id = ?1
+             ORDER BY created_at ASC",
+        )?;
+
+        let rows = stmt
+            .query_map(params![task_id.to_string()], |row| {
+                Ok(serde_json::json!({
+                    "id": row.get::<_, String>(0)?,
+                    "tool_name": row.get::<_, String>(1)?,
+                    "parameters": row.get::<_, String>(2)?,
+                    "success": row.get::<_, i32>(3)? != 0,
+                    "output": row.get::<_, Option<String>>(4)?,
+                    "error": row.get::<_, Option<String>>(5)?,
+                    "duration_ms": row.get::<_, Option<i64>>(6)?,
+                    "created_at": row.get::<_, String>(7)?,
+                }))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(rows)
     }
 
     /// Cache a permission decision.

@@ -9,6 +9,7 @@ import { VoicePanel } from "./components/VoicePanel";
 import { Canvas } from "./components/Canvas";
 import { TaskTree } from "./components/TaskTree";
 import { TrainingDashboard } from "./components/TrainingDashboard";
+import { ExecutionTimeline } from "./components/ExecutionTimeline";
 
 import Settings from "./components/Settings";
 import { useState, useEffect } from "react";
@@ -19,6 +20,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [isTrainingOpen, setIsTrainingOpen] = useState(false);
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
   const [isHatched, setIsHatched] = useState<boolean | null>(null);
 
   // Derive active state
@@ -93,6 +95,13 @@ function App() {
           </div>
           <div className="flex items-center gap-4">
             <AgentStatus state={state} />
+            <button
+              onClick={() => setIsTimelineOpen(!isTimelineOpen)}
+              className={`p-2 transition-colors ${isTimelineOpen ? "text-primary-400" : "text-gray-400 hover:text-white"}`}
+              title="Execution Timeline"
+            >
+              🕐
+            </button>
             <button
               onClick={() => setIsCanvasOpen(!isCanvasOpen)}
               className={`p-2 transition-colors ${isCanvasOpen ? "text-primary-400" : "text-gray-400 hover:text-white"}`}

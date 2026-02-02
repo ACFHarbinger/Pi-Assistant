@@ -97,7 +97,7 @@ Direct SQL access to user-specified databases (SQLite, PostgreSQL, MySQL) for da
 
 A generic HTTP client tool that the agent can use to interact with external APIs.
 
-- OpenAPI/Swagger spec ingestion: given a spec URL, the agent learns all available endpoints
+- OpenAPI/Swagger spec ingestion: [IMPLEMENTED] given a spec URL, the agent learns all available endpoints
 - Authentication management: OAuth2 flows, API key storage (encrypted in permission-gated keyring)
 - Rate limiting awareness: the agent respects `Retry-After` headers and backs off appropriately
 - Response caching: avoid redundant API calls within the same task
@@ -364,14 +364,14 @@ Define execution profiles with strict resource and access boundaries.
 - Process policies: max child processes, CPU time limits, memory caps
 - Profiles are composable: "web-dev" = "shell-safe" + "browser-localhost" + "npm-install"
 
-### 7.2 Rollback & Undo
+### 7.2 Rollback & Undo [IMPLEMENTED]
 
 Every file modification and shell command is recorded in a transaction log that supports rollback.
 
-- Automatic filesystem snapshots before destructive operations
-- "Undo last action" command that reverses the most recent tool execution
-- "Undo task" command that reverses all changes from a completed task
-- Git-aware rollback: if changes were committed, create a revert commit
+- [x] **Automatic filesystem snapshots** — _Implemented via `TransactionManager` and `CodeTool` integration_
+- [x] **"Undo last action" command** — _Implemented via `undo` command in `TransactionManager`_
+- [ ] "Undo task" command that reverses all changes from a completed task
+- [ ] Git-aware rollback: if changes were committed, create a revert commit
 
 ### 7.3 Anomaly Detection
 
@@ -590,24 +590,25 @@ When the agent trains a task-specific model (10.1), it can use NAS to automatica
 - Constraint-aware: the user specifies max model size, max inference latency, or target device — NAS respects these constraints
 - Results stored in the model registry with architecture metadata for reproducibility
 
-### 10.4 Continual & Incremental Learning
+### 10.4 Continual & Incremental Learning [PARTIALLY IMPLEMENTED]
 
 Models trained by the agent should be updatable with new data without catastrophic forgetting.
 
-- **Elastic Weight Consolidation (EWC)**: penalize changes to weights that were important for previous tasks
-- **Replay buffer**: store a small subset of old training data and mix it into new training batches
-- **Adapter layers (LoRA/QLoRA)**: instead of full fine-tuning, train lightweight adapters that can be stacked — one per data batch or domain
-- **Forgetting detection**: after incremental training, evaluate on a held-out set from each previous data batch and alert if performance degrades
+- [x] **Elastic Weight Consolidation (EWC)**: penalize changes to weights that were important for previous tasks
+- [x] **Replay buffer**: store a small subset of old training data and mix it into new training batches
+- [ ] **Adapter layers (LoRA/QLoRA)**: instead of full fine-tuning, train lightweight adapters that can be stacked — one per data batch or domain
+- [ ] **Forgetting detection**: after incremental training, evaluate on a held-out set from each previous data batch and alert if performance degrades
 
-### 10.5 Transfer Learning & Domain Adaptation
+### 10.5 Transfer Learning & Domain Adaptation [PARTIALLY IMPLEMENTED]
 
 The agent should be able to take a model trained on one task and adapt it for a related task with minimal data.
 
-- **Feature extraction**: freeze base model weights, train only a new classification head
-- **Gradual unfreezing**: unfreeze layers one at a time from the top, training briefly at each step
-- **Domain-adversarial training**: for cases where source and target domains differ significantly (e.g., formal text → colloquial text)
-- **Few-shot adaptation**: given only 5-20 labeled examples, fine-tune with aggressive regularization and data augmentation
-- **Zero-shot via prompting**: for generative models, the agent can attempt the task with prompt engineering before deciding whether fine-tuning is needed
+- [ ] **Feature extraction**: freeze base model weights, train only a new classification head
+- [ ] **Gradual unfreezing**: unfreeze layers one at a time from the top, training briefly at each step
+- [x] **Domain-adversarial training (DANN)**: for cases where source and target domains differ significantly (e.g., formal text → colloquial text)
+- [x] **MMD Domain Adaptation**: Maximum Mean Discrepancy based distribution alignment.
+- [ ] **Few-shot adaptation**: given only 5-20 labeled examples, fine-tune with aggressive regularization and data augmentation
+- [ ] **Zero-shot via prompting**: for generative models, the agent can attempt the task with prompt engineering before deciding whether fine-tuning is needed
 
 ### 10.6 Distributed Training Across Machines
 

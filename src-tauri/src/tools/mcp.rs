@@ -1,4 +1,4 @@
-use super::{PermissionTier, Tool, ToolResult};
+use super::{PermissionTier, Tool, ToolContext, ToolResult};
 use crate::mcp::client::McpToolInfo;
 use crate::mcp::McpClient;
 use anyhow::Result;
@@ -30,7 +30,11 @@ impl Tool for McpToolWrapper {
         self.info.input_schema.clone()
     }
 
-    async fn execute(&self, params: serde_json::Value) -> Result<ToolResult> {
+    async fn execute(
+        &self,
+        params: serde_json::Value,
+        _context: ToolContext,
+    ) -> Result<ToolResult> {
         match self.client.call_tool(&self.info.name, params).await {
             Ok(output) => Ok(ToolResult::success(output)),
             Err(e) => Ok(ToolResult::error(format!("{}", e))),
