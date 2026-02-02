@@ -45,12 +45,12 @@ impl AppState {
         let ml_sidecar = Arc::new(Mutex::new(
             SidecarHandle::new()
                 .with_sidecar_dir("ml")
-                .with_sidecar_module("pi_sidecar.ml_sidecar_main"),
+                .with_sidecar_module("ml_sidecar_main"),
         ));
         let logic_sidecar = Arc::new(Mutex::new(
             SidecarHandle::new()
                 .with_sidecar_dir("ml")
-                .with_sidecar_module("pi_sidecar.logic_main"),
+                .with_sidecar_module("logic_main"),
         ));
 
         let cron_manager = CronManager::new(&config_dir, agent_cmd_tx.clone())

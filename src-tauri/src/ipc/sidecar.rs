@@ -135,8 +135,18 @@ impl SidecarHandle {
             info!("Using system python: {}", self.python_path);
         }
 
-        // Combine PYTHONPATH
-        let python_path = sidecar_src.to_string_lossy().to_string();
+        // Combine PYTHONPATH - handle nested pi_sidecar/src structure
+        let nested_src = sidecar_src.join("pi_sidecar/src");
+        let python_path = if nested_src.exists() {
+            // For pi_sidecar project with nested src directory
+            format!(
+                "{}:{}",
+                nested_src.to_string_lossy(),
+                sidecar_src.to_string_lossy()
+            )
+        } else {
+            sidecar_src.to_string_lossy().to_string()
+        };
 
         info!("Setting PYTHONPATH to: {}", python_path);
 
