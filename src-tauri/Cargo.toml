@@ -62,7 +62,7 @@ serenity = { version = "0.12", default-features = false, features = [
 ] }
 serde_yaml = "0.9"
 chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = "0.9"
+chrono-tz = "0.10"
 sysinfo = "0.33"
 libc = "0.2"
 
