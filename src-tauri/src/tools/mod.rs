@@ -8,8 +8,12 @@ pub mod cron;
 pub mod database;
 pub mod deployed_model;
 pub mod diagram;
+pub mod graph;
+pub mod knowledge;
+pub mod rag;
 pub mod sessions;
 pub mod shell;
+pub mod system;
 pub mod training;
 
 use anyhow::Result;
@@ -37,6 +41,8 @@ pub struct ToolResult {
 #[derive(Clone)]
 pub struct ToolContext {
     pub transactions: Option<Arc<Mutex<crate::agent::transaction::TransactionManager>>>,
+    pub memory: Option<Arc<crate::memory::MemoryManager>>,
+    pub session_id: uuid::Uuid,
 }
 
 /// Trait for an action that can be rolled back.
@@ -130,6 +136,12 @@ impl ToolRegistry {
         registry.register(Arc::new(cron::CronTool::new(cron_manager)));
         registry.register(Arc::new(database::DatabaseTool::new()));
         registry.register(Arc::new(api::ApiTool::new()));
+        registry.register(Arc::new(graph::KnowledgeGraphTool::new()));
+        registry.register(Arc::new(system::SystemTool::new()));
+
+        let embedding_generator = Arc::new(crate::memory::EmbeddingGenerator::new(_ml_sidecar));
+        registry.register(Arc::new(rag::RagTool::new(embedding_generator.clone())));
+        registry.register(Arc::new(knowledge::KnowledgeTool::new(embedding_generator)));
 
         registry
     }
@@ -279,7 +291,14 @@ mod tests {
         };
 
         let result = registry
-            .execute(&call, ToolContext { transactions: None })
+            .execute(
+                &call,
+                ToolContext {
+                    transactions: None,
+                    memory: None,
+                    session_id: uuid::Uuid::nil(),
+                },
+            )
             .await
             .unwrap();
         assert!(result.success);

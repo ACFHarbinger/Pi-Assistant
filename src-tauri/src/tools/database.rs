@@ -11,10 +11,15 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
 
+struct DbSession {
+    conn: Connection,
+    readonly: bool,
+}
+
 /// Database tool for SQL access to user-specified databases.
 pub struct DatabaseTool {
     /// Active connections keyed by alias.
-    connections: Arc<Mutex<HashMap<String, Connection>>>,
+    connections: Arc<Mutex<HashMap<String, DbSession>>>,
 }
 
 impl DatabaseTool {
@@ -33,12 +38,12 @@ impl DatabaseTool {
             .to_string()
     }
 
-    async fn connect(&self, path: &str, alias: Option<&str>) -> Result<ToolResult> {
+    async fn connect(&self, path: &str, alias: Option<&str>, readonly: bool) -> Result<ToolResult> {
         let alias = alias
             .map(|s| s.to_string())
             .unwrap_or_else(|| Self::default_alias(path));
 
-        info!(path = %path, alias = %alias, "Connecting to database");
+        info!(path = %path, alias = %alias, readonly = %readonly, "Connecting to database");
 
         let path_buf = PathBuf::from(path);
         if !path_buf.exists() {
@@ -48,7 +53,13 @@ impl DatabaseTool {
             )));
         }
 
-        let conn = match Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE) {
+        let flags = if readonly {
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+        } else {
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+        };
+
+        let conn = match Connection::open_with_flags(path, flags) {
             Ok(c) => c,
             Err(e) => {
                 return Ok(ToolResult::error(format!("Failed to open database: {}", e)));
@@ -56,12 +67,13 @@ impl DatabaseTool {
         };
 
         let mut connections = self.connections.lock().await;
-        connections.insert(alias.clone(), conn);
+        connections.insert(alias.clone(), DbSession { conn, readonly });
 
-        Ok(
-            ToolResult::success(format!("Connected to '{}' as alias '{}'", path, alias))
-                .with_data(json!({ "alias": alias, "path": path })),
-        )
+        Ok(ToolResult::success(format!(
+            "Connected to '{}' as alias '{}' (readonly: {})",
+            path, alias, readonly
+        ))
+        .with_data(json!({ "alias": alias, "path": path, "readonly": readonly })))
     }
 
     async fn disconnect(&self, alias: &str) -> Result<ToolResult> {
@@ -83,7 +95,7 @@ impl DatabaseTool {
         info!(alias = %alias, sql = %sql, "Executing query");
 
         let connections = self.connections.lock().await;
-        let conn = match connections.get(alias) {
+        let session = match connections.get(alias) {
             Some(c) => c,
             None => {
                 return Ok(ToolResult::error(format!(
@@ -92,6 +104,12 @@ impl DatabaseTool {
                 )));
             }
         };
+        let conn = &session.conn;
+
+        // If readonly, we prevent write statements if we can detect them,
+        // but opening with SQLITE_OPEN_READ_ONLY is the primary defense.
+        // However, if the user opened as RW, but wants to be safe, we could check here too?
+        // For now, rely on connection flags.
 
         let mut stmt = match conn.prepare(sql) {
             Ok(s) => s,
@@ -170,7 +188,7 @@ impl DatabaseTool {
         info!(alias = %alias, "Listing tables");
 
         let connections = self.connections.lock().await;
-        let conn = match connections.get(alias) {
+        let session = match connections.get(alias) {
             Some(c) => c,
             None => {
                 return Ok(ToolResult::error(format!(
@@ -179,6 +197,7 @@ impl DatabaseTool {
                 )));
             }
         };
+        let conn = &session.conn;
 
         let mut stmt = conn.prepare(
             "SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') ORDER BY name",
@@ -205,7 +224,7 @@ impl DatabaseTool {
         info!(alias = %alias, table = ?table, "Inspecting schema");
 
         let connections = self.connections.lock().await;
-        let conn = match connections.get(alias) {
+        let session = match connections.get(alias) {
             Some(c) => c,
             None => {
                 return Ok(ToolResult::error(format!(
@@ -214,6 +233,7 @@ impl DatabaseTool {
                 )));
             }
         };
+        let conn = &session.conn;
 
         match table {
             Some(table_name) => {
@@ -329,7 +349,7 @@ impl DatabaseTool {
         info!(alias = %alias, sql = %sql, "Explaining query");
 
         let connections = self.connections.lock().await;
-        let conn = match connections.get(alias) {
+        let session = match connections.get(alias) {
             Some(c) => c,
             None => {
                 return Ok(ToolResult::error(format!(
@@ -338,6 +358,7 @@ impl DatabaseTool {
                 )));
             }
         };
+        let conn = &session.conn;
 
         let explain_sql = format!("EXPLAIN QUERY PLAN {}", sql);
         let mut stmt = match conn.prepare(&explain_sql) {
@@ -401,6 +422,10 @@ impl Tool for DatabaseTool {
                     "type": "string",
                     "description": "Connection alias (defaults to filename)"
                 },
+                "readonly": {
+                    "type": "boolean",
+                    "description": "Open in read-only mode (default: true). Set to false for writes."
+                },
                 "sql": {
                     "type": "string",
                     "description": "SQL query (required for 'query' and 'explain')"
@@ -426,7 +451,11 @@ impl Tool for DatabaseTool {
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| anyhow::anyhow!("Missing 'path' for connect"))?;
                 let alias = params.get("alias").and_then(|v| v.as_str());
-                self.connect(path, alias).await
+                let readonly = params
+                    .get("readonly")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+                self.connect(path, alias, readonly).await
             }
             "query" => {
                 let alias = params
@@ -447,6 +476,7 @@ impl Tool for DatabaseTool {
                 let table = params.get("table").and_then(|v| v.as_str());
                 self.schema(alias, table).await
             }
+
             "explain" => {
                 let alias = params
                     .get("alias")
@@ -543,4 +573,60 @@ fn format_ascii_table(columns: &[String], rows: &[Vec<String>]) -> String {
     }
 
     output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[tokio::test]
+    async fn test_database_readonly() -> Result<()> {
+        let db_tool = DatabaseTool::new();
+        let db_path = std::env::temp_dir().join("test_db_readonly.sqlite");
+        let db_str = db_path.to_str().unwrap();
+
+        // 1. Create DB and Table in RW mode (using direct connection or tool)
+        {
+            let conn = Connection::open(&db_path)?;
+            conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, val TEXT)", [])?;
+            conn.execute("INSERT INTO test (val) VALUES ('foo')", [])?;
+        }
+
+        // 2. Connect ReadOnly via Tool (default)
+        let res = db_tool.connect(db_str, Some("ro"), true).await?;
+        assert!(res.success);
+
+        // 3. Query (SELECT) - Should succeed
+        let res = db_tool.query("ro", "SELECT * FROM test").await?;
+        assert!(res.success);
+        assert!(res.output.contains("foo"));
+
+        // 4. Query (INSERT) - Should fail
+        let res = db_tool
+            .query("ro", "INSERT INTO test (val) VALUES ('bar')")
+            .await;
+        // SQLite read-only constraint violation usually returns generic SQLite error
+        assert!(res.is_ok()); // The tool returns Ok(ToolResult::error(...))
+        let tool_res = res.unwrap();
+        assert!(!tool_res.success);
+        let error_msg = tool_res.error.unwrap_or_default();
+        assert!(error_msg.contains("attempt to write a readonly database"));
+
+        // 5. Connect RW via Tool
+        db_tool.disconnect("ro").await?;
+        let res = db_tool.connect(db_str, Some("rw"), false).await?;
+        assert!(res.success);
+
+        // 6. Query (INSERT) - Should succeed
+        let res = db_tool
+            .query("rw", "INSERT INTO test (val) VALUES ('bar')")
+            .await?;
+        assert!(res.success);
+
+        // Cleanup
+        let _ = fs::remove_file(db_path);
+
+        Ok(())
+    }
 }

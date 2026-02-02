@@ -2962,6 +2962,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ntapi"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c70f219e21142367c70c0b30c6a9e3a14d55b4d12a204d897fbec83a0363f081"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "nu-ansi-term"
 version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3619,6 +3628,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chromiumoxide",
+ "chrono",
  "chrono-tz",
  "cpal",
  "dirs 5.0.1",
@@ -3626,6 +3636,7 @@ dependencies = [
  "hex",
  "hmac",
  "hound",
+ "libc",
  "openapiv3",
  "pi-core",
  "pi-protocol",
@@ -3638,6 +3649,7 @@ dependencies = [
  "serde_yaml",
  "serenity",
  "sha2",
+ "sysinfo",
  "tauri",
  "tauri-build",
  "tauri-plugin-shell",
@@ -5126,6 +5138,20 @@ dependencies = [
  "libc",
  "thiserror 1.0.69",
  "walkdir",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.33.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fc858248ea01b66f19d8e8a6d55f41deaf91e9d495246fd01368d99935c6c01"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+ "memchr",
+ "ntapi",
+ "rayon",
+ "windows 0.54.0",
 ]
 
 [[package]]

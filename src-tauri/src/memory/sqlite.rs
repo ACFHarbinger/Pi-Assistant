@@ -116,11 +116,67 @@ impl MemoryManager {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            -- RAG Chunks
+            CREATE TABLE IF NOT EXISTS rag_chunks (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                document_name TEXT NOT NULL,
+                content TEXT NOT NULL,
+                embedding BLOB NOT NULL,
+                metadata TEXT, -- JSON
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
+            );
+
             -- Indexes
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
             CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id);
             CREATE INDEX IF NOT EXISTS idx_tool_executions_task ON tool_executions(task_id);
             CREATE INDEX IF NOT EXISTS idx_subtasks_root ON subtasks(root_task_id);
+            CREATE INDEX IF NOT EXISTS idx_rag_chunks_session ON rag_chunks(session_id);
+
+            -- Knowledge Graph: Entities
+            CREATE TABLE IF NOT EXISTS entities (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                metadata TEXT, -- JSON
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(name, entity_type)
+            );
+
+            -- Knowledge Graph: Relations
+            CREATE TABLE IF NOT EXISTS relations (
+                id TEXT PRIMARY KEY,
+                from_entity_id TEXT NOT NULL,
+                to_entity_id TEXT NOT NULL,
+                relation_type TEXT NOT NULL,
+                weight REAL DEFAULT 1.0,
+                metadata TEXT, -- JSON
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(from_entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+                FOREIGN KEY(to_entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+                UNIQUE(from_entity_id, to_entity_id, relation_type)
+            );
+
+            -- Graph Indexes
+            CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
+            CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);
+            CREATE INDEX IF NOT EXISTS idx_relations_from ON relations(from_entity_id);
+            CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_entity_id);
+            CREATE INDEX IF NOT EXISTS idx_relations_type ON relations(relation_type);
+
+            -- Episode Summaries
+            CREATE TABLE IF NOT EXISTS episode_summaries (
+                id TEXT PRIMARY KEY,
+                task_id TEXT NOT NULL UNIQUE,
+                summary TEXT NOT NULL,
+                embedding BLOB,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_episode_summaries_task ON episode_summaries(task_id);
         "#,
         )?;
 
@@ -137,6 +193,21 @@ impl MemoryManager {
                 [],
             )?;
             info!("Migration: added duration_ms column to tool_executions");
+        }
+
+        // Migration: add expires_at column to permission_cache if not present
+        let has_expires: bool = conn
+            .prepare("SELECT COUNT(*) FROM pragma_table_info('permission_cache') WHERE name='expires_at'")?
+            .query_row([], |row| row.get::<_, i64>(0))
+            .unwrap_or(0)
+            > 0;
+
+        if !has_expires {
+            conn.execute(
+                "ALTER TABLE permission_cache ADD COLUMN expires_at TEXT DEFAULT NULL",
+                [],
+            )?;
+            info!("Migration: added expires_at column to permission_cache");
         }
 
         info!("Database schema initialized");
@@ -295,23 +366,41 @@ impl MemoryManager {
     }
 
     /// Retrieve context for the agent planner.
+    /// This implementation includes token-aware pruning to fit within context windows.
     pub async fn retrieve_context(
         &self,
         _task_description: &str,
         session_id: &Uuid,
         limit: usize,
     ) -> Result<Vec<serde_json::Value>> {
-        let messages = self.get_recent_messages(session_id, limit)?;
+        // Fetch more than needed initially to allow for pruning
+        let messages = self.get_recent_messages(session_id, limit * 2)?;
 
-        Ok(messages
-            .iter()
-            .map(|m| {
-                serde_json::json!({
-                    "role": m.role,
-                    "content": m.content,
-                })
-            })
-            .collect())
+        const MAX_CONTEXT_CHARS: usize = 16000; // ~4000 tokens
+        let mut total_chars = 0;
+        let mut pruned_messages = Vec::new();
+
+        // Iterate backwards from most recent
+        for m in messages.iter().rev() {
+            let msg_chars = m.content.len();
+            if total_chars + msg_chars > MAX_CONTEXT_CHARS && !pruned_messages.is_empty() {
+                debug!(
+                    total_chars,
+                    excess = msg_chars,
+                    "Pruning context to fit window"
+                );
+                break;
+            }
+            total_chars += msg_chars;
+            pruned_messages.push(serde_json::json!({
+                "role": m.role,
+                "content": m.content,
+            }));
+        }
+
+        // Reverse back to chronological order
+        pruned_messages.reverse();
+        Ok(pruned_messages)
     }
 
     /// Retrieve the execution timeline for a task.
@@ -343,12 +432,17 @@ impl MemoryManager {
     }
 
     /// Cache a permission decision.
-    pub fn cache_permission(&self, pattern: &str, allowed: bool) -> Result<()> {
+    pub fn cache_permission(
+        &self,
+        pattern: &str,
+        allowed: bool,
+        expires_at: Option<String>,
+    ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
 
         conn.execute(
-            "INSERT OR REPLACE INTO permission_cache (pattern, allowed) VALUES (?1, ?2)",
-            params![pattern, allowed as i32],
+            "INSERT OR REPLACE INTO permission_cache (pattern, allowed, expires_at) VALUES (?1, ?2, ?3)",
+            params![pattern, allowed as i32, expires_at],
         )?;
 
         Ok(())
@@ -357,6 +451,12 @@ impl MemoryManager {
     /// Check cached permission.
     pub fn get_cached_permission(&self, pattern: &str) -> Result<Option<bool>> {
         let conn = self.conn.lock().unwrap();
+        // Clean up expired entries first (lazy cleanup)
+        conn.execute(
+            "DELETE FROM permission_cache WHERE expires_at IS NOT NULL AND expires_at < datetime('now')",
+            [],
+        )?;
+
         let mut stmt = conn.prepare("SELECT allowed FROM permission_cache WHERE pattern = ?1")?;
 
         let result = stmt.query_row(params![pattern], |row| Ok(row.get::<_, i32>(0)? != 0));
@@ -367,6 +467,322 @@ impl MemoryManager {
             Err(e) => Err(e.into()),
         }
     }
+
+    // --- Knowledge Graph Operations ---
+
+    /// Upsert an entity. Returns the entity ID.
+    pub fn upsert_entity(
+        &self,
+        name: &str,
+        entity_type: &str,
+        metadata: Option<serde_json::Value>,
+    ) -> Result<Uuid> {
+        let conn = self.conn.lock().unwrap();
+        let id = Uuid::new_v4();
+
+        // Check if exists
+        let existing_id: Option<String> = conn
+            .query_row(
+                "SELECT id FROM entities WHERE name = ?1 AND entity_type = ?2",
+                params![name, entity_type],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(existing) = existing_id {
+            let uuid = Uuid::parse_str(&existing)?;
+            // Update metadata if provided
+            if let Some(meta) = metadata {
+                conn.execute(
+                    "UPDATE entities SET metadata = ?1, updated_at = datetime('now') WHERE id = ?2",
+                    params![meta.to_string(), existing],
+                )?;
+            }
+            return Ok(uuid);
+        }
+
+        conn.execute(
+            "INSERT INTO entities (id, name, entity_type, metadata) VALUES (?1, ?2, ?3, ?4)",
+            params![
+                id.to_string(),
+                name,
+                entity_type,
+                metadata.map(|m| m.to_string())
+            ],
+        )?;
+
+        Ok(id)
+    }
+
+    /// Add a relation between two entities.
+    pub fn add_relation(
+        &self,
+        from_id: &Uuid,
+        to_id: &Uuid,
+        relation_type: &str,
+        weight: f64,
+    ) -> Result<Uuid> {
+        let conn = self.conn.lock().unwrap();
+        let id = Uuid::new_v4();
+
+        conn.execute(
+            "INSERT OR REPLACE INTO relations (id, from_entity_id, to_entity_id, relation_type, weight) 
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                id.to_string(),
+                from_id.to_string(),
+                to_id.to_string(),
+                relation_type,
+                weight
+            ],
+        )?;
+
+        Ok(id)
+    }
+
+    /// Find related entities for a given entity.
+    pub fn find_related_entities(&self, entity_name: &str, limit: usize) -> Result<Vec<GraphNode>> {
+        let conn = self.conn.lock().unwrap();
+
+        // simple query: find outgoing relations from entities matching the name
+        let mut stmt = conn.prepare(
+            r#"
+             SELECT e2.name, e2.entity_type, r.relation_type, r.weight
+             FROM entities e1
+             JOIN relations r ON e1.id = r.from_entity_id
+             JOIN entities e2 ON r.to_entity_id = e2.id
+             WHERE e1.name = ?1
+             ORDER BY r.weight DESC
+             LIMIT ?2
+             "#,
+        )?;
+
+        let rows = stmt.query_map(params![entity_name, limit as i64], |row| {
+            Ok(GraphNode {
+                name: row.get(0)?,
+                entity_type: row.get(1)?,
+                relation: row.get(2)?,
+                weight: row.get(3)?,
+            })
+        })?;
+
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.into())
+    }
+
+    // --- RAG Operations ---
+
+    /// Store a RAG chunk with its embedding.
+    pub fn store_rag_chunk(
+        &self,
+        session_id: &Uuid,
+        document_name: &str,
+        content: &str,
+        embedding: &[f32],
+        metadata: Option<serde_json::Value>,
+    ) -> Result<Uuid> {
+        let id = Uuid::new_v4();
+        let conn = self.conn.lock().unwrap();
+
+        // Convert f32 array to little-endian bytes for the BLOB
+        let mut blob = Vec::with_capacity(embedding.len() * 4);
+        for &f in embedding {
+            blob.extend_from_slice(&f.to_le_bytes());
+        }
+
+        let metadata_str = metadata.map(|m| m.to_string());
+
+        conn.execute(
+            "INSERT INTO rag_chunks (id, session_id, document_name, content, embedding, metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                id.to_string(),
+                session_id.to_string(),
+                document_name,
+                content,
+                blob,
+                metadata_str
+            ],
+        )?;
+
+        Ok(id)
+    }
+
+    /// Retrieve all RAG chunks for a session to perform similarity search in Rust.
+    pub fn get_rag_chunks(
+        &self,
+        session_id: &Uuid,
+    ) -> Result<Vec<(String, String, Vec<f32>, Option<serde_json::Value>)>> {
+        self.get_rag_chunks_multi(&[*session_id])
+    }
+
+    /// Retrieve all RAG chunks for multiple sessions to perform similarity search in Rust.
+    pub fn get_rag_chunks_multi(
+        &self,
+        session_ids: &[Uuid],
+    ) -> Result<Vec<(String, String, Vec<f32>, Option<serde_json::Value>)>> {
+        if session_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let conn = self.conn.lock().unwrap();
+
+        // Build placeholders like (?1, ?2, ...)
+        let mut placeholders = String::from("(");
+        for i in 1..=session_ids.len() {
+            placeholders.push_str(&format!("?{}", i));
+            if i < session_ids.len() {
+                placeholders.push(',');
+            }
+        }
+        placeholders.push(')');
+
+        let query = format!(
+            "SELECT content, document_name, embedding, metadata FROM rag_chunks WHERE session_id IN {}",
+            placeholders
+        );
+
+        let mut stmt = conn.prepare(&query)?;
+
+        let id_strs: Vec<String> = session_ids.iter().map(|id| id.to_string()).collect();
+        let params_vec: Vec<&dyn rusqlite::ToSql> =
+            id_strs.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+
+        let rows = stmt.query_map(rusqlite::params_from_iter(params_vec), |row| {
+            let content: String = row.get(0)?;
+            let doc_name: String = row.get(1)?;
+            let blob: Vec<u8> = row.get(2)?;
+            let metadata_str: Option<String> = row.get(3)?;
+
+            // Convert little-endian bytes back to f32
+            let mut floats = Vec::with_capacity(blob.len() / 4);
+            for chunk in blob.chunks_exact(4) {
+                let bytes: [u8; 4] = match chunk.try_into() {
+                    Ok(b) => b,
+                    Err(_) => continue,
+                };
+                floats.push(f32::from_le_bytes(bytes));
+            }
+
+            let metadata = metadata_str.and_then(|s| serde_json::from_str(&s).ok());
+
+            Ok((content, doc_name, floats, metadata))
+        })?;
+
+        let mut chunks = Vec::new();
+        for row in rows {
+            chunks.push(row?);
+        }
+        Ok(chunks)
+    }
+
+    /// Delete all RAG chunks for a specific document in a session.
+    pub fn delete_document_chunks(&self, session_id: &Uuid, document_name: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM rag_chunks WHERE session_id = ?1 AND document_name = ?2",
+            params![session_id.to_string(), document_name],
+        )?;
+        Ok(())
+    }
+
+    // =========================================================================
+    // Episode Summaries
+    // =========================================================================
+
+    /// Store an episode summary for a completed task.
+    pub fn store_episode_summary(
+        &self,
+        task_id: &Uuid,
+        summary: &str,
+        embedding: Option<&[f32]>,
+    ) -> Result<Uuid> {
+        let id = Uuid::new_v4();
+        let conn = self.conn.lock().unwrap();
+
+        let blob: Option<Vec<u8>> = embedding.map(|emb| {
+            let mut bytes = Vec::with_capacity(emb.len() * 4);
+            for &f in emb {
+                bytes.extend_from_slice(&f.to_le_bytes());
+            }
+            bytes
+        });
+
+        conn.execute(
+            "INSERT OR REPLACE INTO episode_summaries (id, task_id, summary, embedding) VALUES (?1, ?2, ?3, ?4)",
+            params![id.to_string(), task_id.to_string(), summary, blob],
+        )?;
+
+        debug!(summary_id = %id, task_id = %task_id, "Stored episode summary");
+        Ok(id)
+    }
+
+    /// Retrieve the episode summary for a specific task.
+    pub fn get_episode_summary(&self, task_id: &Uuid) -> Result<Option<EpisodeSummary>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT id, summary, created_at FROM episode_summaries WHERE task_id = ?1")?;
+
+        let mut rows = stmt.query(params![task_id.to_string()])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(EpisodeSummary {
+                id: row.get(0)?,
+                task_id: task_id.to_string(),
+                summary: row.get(1)?,
+                created_at: row.get(2)?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get recent episode summaries for a session (most recent first).
+    pub fn get_recent_summaries(
+        &self,
+        session_id: &Uuid,
+        limit: usize,
+    ) -> Result<Vec<EpisodeSummary>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT es.id, es.task_id, es.summary, es.created_at 
+             FROM episode_summaries es
+             JOIN tasks t ON es.task_id = t.id
+             WHERE t.session_id = ?1
+             ORDER BY es.created_at DESC
+             LIMIT ?2",
+        )?;
+
+        let rows = stmt.query_map(params![session_id.to_string(), limit as i64], |row| {
+            Ok(EpisodeSummary {
+                id: row.get(0)?,
+                task_id: row.get(1)?,
+                summary: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+
+        let mut summaries = Vec::new();
+        for row in rows {
+            summaries.push(row?);
+        }
+        Ok(summaries)
+    }
+}
+
+/// Episode summary from the database.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EpisodeSummary {
+    pub id: String,
+    pub task_id: String,
+    pub summary: String,
+    pub created_at: String,
+}
+
+/// A node in the knowledge graph response.
+#[derive(Debug, serde::Serialize)]
+pub struct GraphNode {
+    pub name: String,
+    pub entity_type: String,
+    pub relation: String,
+    pub weight: f64,
 }
 
 /// Message from the database.
@@ -376,4 +792,84 @@ pub struct Message {
     pub role: String,
     pub content: String,
     pub created_at: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_knowledge_graph() {
+        let memory = MemoryManager::in_memory().unwrap();
+
+        let id1 = memory.upsert_entity("Rust", "Language", None).unwrap();
+        let id2 = memory
+            .upsert_entity("Performance", "Attribute", None)
+            .unwrap();
+
+        memory.add_relation(&id1, &id2, "has_feature", 0.9).unwrap();
+
+        // Use a short delay or ensure ordering isn't an issue if we had multiple
+        let related = memory.find_related_entities("Rust", 5).unwrap();
+        assert_eq!(related[0].name, "Performance");
+        assert_eq!(related[0].relation, "has_feature");
+    }
+
+    #[test]
+    fn test_rag_storage() {
+        let memory = MemoryManager::in_memory().unwrap();
+        let session_id = memory.create_session(Some("Test")).unwrap();
+        let embedding = vec![0.1, 0.2, 0.3];
+
+        memory
+            .store_rag_chunk(&session_id, "test.txt", "hello world", &embedding, None)
+            .unwrap();
+
+        let chunks = memory.get_rag_chunks(&session_id).unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].0, "hello world");
+        assert_eq!(chunks[0].1, "test.txt");
+        assert_eq!(chunks[0].2, embedding);
+    }
+
+    #[test]
+    fn test_rag_storage_multi() {
+        let memory = MemoryManager::in_memory().unwrap();
+        let sid1 = memory.create_session(Some("S1")).unwrap();
+        let sid2 = memory.create_session(Some("S2")).unwrap();
+
+        let emb = vec![0.1, 0.2, 0.3];
+        memory
+            .store_rag_chunk(&sid1, "d1.txt", "content 1", &emb, None)
+            .unwrap();
+        memory
+            .store_rag_chunk(&sid2, "d2.txt", "content 2", &emb, None)
+            .unwrap();
+
+        let chunks = memory.get_rag_chunks_multi(&[sid1, sid2]).unwrap();
+        assert_eq!(chunks.len(), 2);
+    }
+
+    #[test]
+    fn test_episode_summary_storage() {
+        let memory = MemoryManager::in_memory().unwrap();
+        let session_id = memory.create_session(Some("Test")).unwrap();
+        let task_id = memory.create_task(&session_id, "Test task").unwrap();
+
+        let summary = "User asked to build a web page. Used 3 tools. Task completed successfully.";
+        memory
+            .store_episode_summary(&task_id, summary, None)
+            .unwrap();
+
+        let retrieved = memory.get_episode_summary(&task_id).unwrap();
+        assert!(retrieved.is_some());
+        let ep = retrieved.unwrap();
+        assert_eq!(ep.summary, summary);
+        assert_eq!(ep.task_id, task_id.to_string());
+
+        // Test retrieval by session
+        let recent = memory.get_recent_summaries(&session_id, 10).unwrap();
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].summary, summary);
+    }
 }

@@ -33,6 +33,8 @@ pub fn run() {
         .setup(|app| {
             tauri::async_runtime::block_on(async {
                 let state = state::AppState::new().await;
+                state.spawn_sidecar_listeners(app.handle().clone()).await;
+                state.spawn_resource_monitor(app.handle().clone()).await;
                 let ml_sidecar = state.ml_sidecar.clone();
                 let tool_registry = state.tool_registry.clone();
                 let memory = state.memory.clone();

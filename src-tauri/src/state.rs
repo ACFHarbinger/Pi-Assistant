@@ -26,6 +26,7 @@ pub struct AppState {
     pub channel_manager: Arc<ChannelManager>,
     pub cron_manager: Arc<CronManager>,
     pub voice_manager: Arc<Mutex<crate::voice::VoiceManager>>,
+    pub system_tool: Arc<crate::tools::system::SystemTool>,
     pub skill_manager: Arc<tokio::sync::RwLock<SkillManager>>,
     pub chat_session_id: Arc<RwLock<Uuid>>,
 }
@@ -57,11 +58,14 @@ impl AppState {
             .expect("Failed to initialize cron manager");
         let cron_manager_arc = Arc::new(cron_manager);
 
+        let system_tool = Arc::new(crate::tools::system::SystemTool::new());
+
         let mut tool_registry = ToolRegistry::new(
             ml_sidecar.clone(),
             logic_sidecar.clone(),
             cron_manager_arc.clone(),
         );
+        tool_registry.register(system_tool.clone());
         if let Err(e) = tool_registry.load_mcp_tools().await {
             tracing::warn!("Failed to load MCP tools: {}", e);
         }
@@ -117,8 +121,58 @@ impl AppState {
             channel_manager: Arc::new(ChannelManager::new()),
             cron_manager: cron_manager_arc,
             voice_manager: voice_manager_arc,
+            system_tool,
             skill_manager: skill_manager_arc,
             chat_session_id,
         }
+    }
+
+    pub async fn spawn_sidecar_listeners(&self, app: tauri::AppHandle) {
+        let ml_sidecar = self.ml_sidecar.clone();
+        let mut rx = ml_sidecar
+            .lock()
+            .await
+            .take_progress_rx()
+            .expect("ML progress receiver already taken");
+
+        tokio::spawn(async move {
+            use tauri::Emitter;
+            while let Some(update) = rx.recv().await {
+                // Emit progress to frontend
+                let _ = app.emit("sidecar-progress", update);
+            }
+        });
+    }
+
+    pub async fn spawn_resource_monitor(&self, app: tauri::AppHandle) {
+        let system_tool = self.system_tool.clone();
+        let ml_sidecar = self.ml_sidecar.clone();
+
+        tokio::spawn(async move {
+            use tauri::Emitter;
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(2));
+
+            loop {
+                interval.tick().await;
+
+                // 1. Get CPU/RAM from SystemTool
+                let mut status = system_tool.get_system_status_snapshot().await;
+
+                // 2. Get GPU from ML sidecar
+                let gpu_res = {
+                    let mut ml = ml_sidecar.lock().await;
+                    ml.request("device.refresh", serde_json::json!({})).await
+                };
+
+                if let Ok(gpu_data) = gpu_res {
+                    if let Some(obj) = status.as_object_mut() {
+                        obj.insert("gpu".to_string(), gpu_data);
+                    }
+                }
+
+                // 3. Emit update
+                let _ = app.emit("resource-update", status);
+            }
+        });
     }
 }

@@ -10,6 +10,10 @@ import { Canvas } from "./components/Canvas";
 import { TaskTree } from "./components/TaskTree";
 import { TrainingDashboard } from "./components/TrainingDashboard";
 import { ExecutionTimeline } from "./components/ExecutionTimeline";
+import {
+  ResourceMonitor,
+  useResourceMonitorInit,
+} from "./components/ResourceMonitor";
 
 import Settings from "./components/Settings";
 import { useState, useEffect } from "react";
@@ -21,7 +25,11 @@ function App() {
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [isTrainingOpen, setIsTrainingOpen] = useState(false);
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+  const [isResourcesOpen, setIsResourcesOpen] = useState(false);
   const [isHatched, setIsHatched] = useState<boolean | null>(null);
+
+  // Init resource monitor socket
+  useResourceMonitorInit();
 
   // Derive active state
   const state =
@@ -110,6 +118,13 @@ function App() {
               🎨
             </button>
             <button
+              onClick={() => setIsResourcesOpen(!isResourcesOpen)}
+              className={`p-2 transition-colors ${isResourcesOpen ? "text-primary-400" : "text-gray-400 hover:text-white"}`}
+              title="Resource Monitor"
+            >
+              📈
+            </button>
+            <button
               onClick={() => setIsSettingsOpen(true)}
               className="p-2 text-gray-400 hover:text-white transition-colors"
               title="Settings"
@@ -177,6 +192,13 @@ function App() {
 
       {/* Live Canvas */}
       <Canvas isOpen={isCanvasOpen} onClose={() => setIsCanvasOpen(false)} />
+
+      {/* Resource Monitor Sidebar */}
+      {isResourcesOpen && (
+        <aside className="fixed right-0 top-16 w-80 h-[calc(100vh-4rem)] glass border-l border-white/10 overflow-y-auto z-40">
+          <ResourceMonitor />
+        </aside>
+      )}
 
       {/* Training Dashboard */}
       {isTrainingOpen && (

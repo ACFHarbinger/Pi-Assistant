@@ -10,9 +10,16 @@ export function TrainingDashboard({ onClose }: { onClose: () => void }) {
     deployModel,
     isLoading,
     error,
+    initProgressSocket,
   } = useTrainingStore();
   const [showNewRun, setShowNewRun] = useState(false);
   const [deployRunId, setDeployRunId] = useState<string | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+
+  // Initialize progress socket
+  useEffect(() => {
+    initProgressSocket();
+  }, []);
 
   // Auto-refresh runs
   useEffect(() => {
@@ -68,6 +75,8 @@ export function TrainingDashboard({ onClose }: { onClose: () => void }) {
                 <RunCard
                   key={run.run_id}
                   run={run}
+                  isSelected={selectedRunId === run.run_id}
+                  onSelect={() => setSelectedRunId(run.run_id)}
                   onDeploy={() => setDeployRunId(run.run_id)}
                   onStop={() => stopTraining(run.run_id)}
                 />
@@ -100,6 +109,11 @@ export function TrainingDashboard({ onClose }: { onClose: () => void }) {
                   setDeployRunId(null);
                 }}
               />
+            ) : selectedRunId ? (
+              <RunDetails
+                run={runs.find((r) => r.run_id === selectedRunId)!}
+                onClose={() => setSelectedRunId(null)}
+              />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-500">
                 <p className="text-4xl mb-4">🧠</p>
@@ -118,10 +132,14 @@ export function TrainingDashboard({ onClose }: { onClose: () => void }) {
 
 function RunCard({
   run,
+  isSelected,
+  onSelect,
   onDeploy,
   onStop,
 }: {
   run: TrainingRun;
+  isSelected: boolean;
+  onSelect: () => void;
   onDeploy: () => void;
   onStop: () => void;
 }) {
@@ -135,9 +153,18 @@ function RunCard({
     }[run.status] || "bg-gray-500";
 
   return (
-    <div className="p-3 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors cursor-pointer group">
+    <div
+      className={`p-3 rounded-xl bg-white/5 border transition-all cursor-pointer group ${
+        isSelected
+          ? "border-primary-500 bg-primary-500/10"
+          : "border-white/5 hover:border-white/10"
+      }`}
+      onClick={onSelect}
+    >
       <div className="flex justify-between items-start mb-2">
-        <span className="font-mono text-xs text-gray-400">#{run.run_id}</span>
+        <span className="font-mono text-[10px] text-gray-400">
+          #{run.run_id}
+        </span>
         <span
           className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full ${statusColor}`}
         >
@@ -315,5 +342,136 @@ function DeployForm({
         </button>
       </div>
     </div>
+  );
+}
+
+function RunDetails({
+  run,
+  onClose,
+}: {
+  run: TrainingRun;
+  onClose: () => void;
+}) {
+  const history = run.history || [];
+  const metrics = Object.keys(run.metrics || {}).filter(
+    (m) => m !== "epoch" && m !== "batch" && m !== "run_id" && m !== "event",
+  );
+
+  return (
+    <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="text-xl font-bold">Run Details: {run.run_id}</h3>
+          <span
+            className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
+              run.status === "running"
+                ? "bg-blue-500/20 text-blue-400 animate-pulse"
+                : "bg-gray-500/20 text-gray-400"
+            }`}
+          >
+            {run.status}
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 pb-20">
+        {metrics.map((metric) => (
+          <div
+            key={metric}
+            className="bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-md"
+          >
+            <h4 className="text-xs font-bold uppercase text-gray-400 mb-4">
+              {metric}
+            </h4>
+            <div className="h-48 w-full relative">
+              <LineChart
+                data={history.map((h) => h.metrics[metric] || 0)}
+                color={metric.includes("loss") ? "#ef4444" : "#3b82f6"}
+              />
+            </div>
+            {history.length > 0 &&
+              history[history.length - 1].metrics[metric] !== undefined && (
+                <div className="mt-2 flex justify-between text-[10px] font-mono text-gray-500">
+                  <span>Start</span>
+                  <span>
+                    Current:{" "}
+                    {history[history.length - 1].metrics[metric].toFixed(4)}
+                  </span>
+                </div>
+              )}
+          </div>
+        ))}
+
+        {metrics.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-500 opacity-50">
+            <div className="text-4xl mb-4 animate-bounce">📊</div>
+            <p>Waiting for metrics from sidecar...</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LineChart({ data, color }: { data: number[]; color: string }) {
+  if (data.length < 2)
+    return (
+      <div className="h-full flex items-center justify-center text-[10px] text-gray-600 italic">
+        Insufficient data points for curve...
+      </div>
+    );
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const padding = range * 0.1;
+
+  const points = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * 100;
+      const y = 100 - ((v - (min - padding)) / (range + 2 * padding)) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="w-full h-full overflow-visible drop-shadow-[0_0_8px_rgba(0,0,0,0.5)]"
+    >
+      <defs>
+        <linearGradient
+          id={`grad-${color.replace("#", "")}`}
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="1"
+        >
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+        className="transition-all duration-500 ease-in-out"
+      />
+      <polygon
+        fill={`url(#grad-${color.replace("#", "")})`}
+        points={`0,100 ${points} 100,100`}
+        className="transition-all duration-500 ease-in-out"
+      />
+    </svg>
   );
 }

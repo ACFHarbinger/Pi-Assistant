@@ -46,6 +46,14 @@ impl Tool for ShellTool {
                 "timeout_secs": {
                     "type": "integer",
                     "description": "Timeout in seconds (default: 60)"
+                },
+                "sandbox": {
+                    "type": "boolean",
+                    "description": "Run the command in a containerized sandbox (Docker) for safety (default: false)"
+                },
+                "image": {
+                    "type": "string",
+                    "description": "Docker image to use for sandbox (default: ubuntu:latest)"
                 }
             }
         })
@@ -62,21 +70,62 @@ impl Tool for ShellTool {
             .ok_or_else(|| anyhow::anyhow!("Missing 'command' parameter"))?;
 
         let working_dir = params.get("working_dir").and_then(|v| v.as_str());
+        let sandbox = params
+            .get("sandbox")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let image = params
+            .get("image")
+            .and_then(|v| v.as_str())
+            .unwrap_or("ubuntu:latest");
 
         let timeout_secs = params
             .get("timeout_secs")
             .and_then(|v| v.as_u64())
             .unwrap_or(self.default_timeout.as_secs());
 
-        info!(command = %command, working_dir = ?working_dir, "Executing shell command");
+        info!(command = %command, working_dir = ?working_dir, sandbox = sandbox, "Executing shell command");
 
-        let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg(command);
+        let mut cmd = if sandbox {
+            let mut d_cmd = Command::new("docker");
+            d_cmd.arg("run").arg("--rm");
+
+            // Map working directory
+            let host_dir = if let Some(dir) = working_dir {
+                std::path::Path::new(dir)
+                    .canonicalize()?
+                    .to_string_lossy()
+                    .to_string()
+            } else {
+                std::env::current_dir()?
+                    .canonicalize()?
+                    .to_string_lossy()
+                    .to_string()
+            };
+
+            d_cmd.arg("-v").arg(format!("{}:/workspace", host_dir));
+            d_cmd.arg("-w").arg("/workspace");
+
+            // Map user if on Unix
+            #[cfg(unix)]
+            {
+                let uid = unsafe { libc::getuid() };
+                let gid = unsafe { libc::getgid() };
+                d_cmd.arg("--user").arg(format!("{}:{}", uid, gid));
+            }
+
+            d_cmd.arg(image).arg("sh").arg("-c").arg(command);
+            d_cmd
+        } else {
+            let mut s_cmd = Command::new("sh");
+            s_cmd.arg("-c").arg(command);
+            if let Some(dir) = working_dir {
+                s_cmd.current_dir(dir);
+            }
+            s_cmd
+        };
+
         cmd.env("PAGER", "cat"); // Disable paging
-
-        if let Some(dir) = working_dir {
-            cmd.current_dir(dir);
-        }
 
         let start = std::time::Instant::now();
 

@@ -1,22 +1,36 @@
-//! Vector search placeholder.
-//!
-//! Note: sqlite-vec requires special compilation or the extension file.
-//! This is a stub that returns empty results when not available.
+/// Vector similarity search result.
+#[derive(Debug, serde::Serialize)]
+pub struct SearchResult {
+    pub content: String,
+    pub document_name: String,
+    pub score: f32,
+    pub metadata: Option<serde_json::Value>,
+}
 
-use anyhow::Result;
-use tracing::{debug, info};
+/// Calculate cosine similarity between two vectors.
+pub fn cosine_similarity(v1: &[f32], v2: &[f32]) -> f32 {
+    if v1.len() != v2.len() || v1.is_empty() {
+        return 0.0;
+    }
+    let dot_product: f32 = v1.iter().zip(v2).map(|(a, b)| a * b).sum();
+    let mag1: f32 = v1.iter().map(|a| a * a).sum::<f32>().sqrt();
+    let mag2: f32 = v2.iter().map(|a| a * a).sum::<f32>().sqrt();
+    if mag1 == 0.0 || mag2 == 0.0 {
+        return 0.0;
+    }
+    dot_product / (mag1 * mag2)
+}
 
-/// Vector store for similarity search (placeholder).
+/// Vector store for similarity search.
+/// Currently uses a linear scan over SQLite-stored chunks.
 pub struct VectorStore {
-    /// Flag indicating if sqlite-vec is available.
     enabled: bool,
 }
 
 impl VectorStore {
     /// Create a new vector store.
     pub fn new() -> Self {
-        info!("VectorStore: sqlite-vec not bundled, vector search disabled");
-        Self { enabled: false }
+        Self { enabled: true }
     }
 
     /// Check if vector search is available.
@@ -24,29 +38,35 @@ impl VectorStore {
         self.enabled
     }
 
-    /// Store an embedding (no-op when disabled).
-    pub fn store(&self, _content_type: &str, _content_id: &str, _embedding: &[f32]) -> Result<i64> {
-        if !self.enabled {
-            // Return a dummy ID when disabled
-            return Ok(0);
-        }
-        Ok(0)
-    }
+    /// Perform a linear scan search over provided chunks.
+    pub fn search_linear(
+        &self,
+        query_embedding: &[f32],
+        chunks: Vec<(String, String, Vec<f32>, Option<serde_json::Value>)>,
+        limit: usize,
+    ) -> Vec<SearchResult> {
+        let mut results: Vec<SearchResult> = chunks
+            .into_iter()
+            .map(|(content, document_name, embedding, metadata)| {
+                let score = cosine_similarity(query_embedding, &embedding);
+                SearchResult {
+                    content,
+                    document_name,
+                    score,
+                    metadata,
+                }
+            })
+            .collect();
 
-    /// Search for similar embeddings (returns empty when disabled).
-    pub fn search(&self, _query_embedding: &[f32], _limit: usize) -> Result<Vec<SearchResult>> {
-        debug!("Vector search disabled, returning empty results");
-        Ok(Vec::new())
+        // Sort by score descending
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(limit);
+        results
     }
-}
-
-/// Result of a vector similarity search.
-#[derive(Debug)]
-pub struct SearchResult {
-    pub id: i64,
-    pub content_type: String,
-    pub content_id: String,
-    pub distance: f32,
 }
 
 impl Default for VectorStore {

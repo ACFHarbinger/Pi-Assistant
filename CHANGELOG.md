@@ -22,11 +22,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool System Refactor** — Refactored the `Tool` trait and implementation.
   - Standardized `execute` signature to include `ToolContext`.
   - Enables tools to access shared resources like `TransactionManager`.
+- **Rich Permission Workflows (Backend)** — Implemented backend support for granular and time-limited permissions.
+  - Updated `PermissionEngine` to support wildcard patterns (e.g., `git *`) and expiration.
+  - Added `expires_at` column to `permission_cache` table for persistent, time-limited overrides.
+  - Updated `AgentLoop` to persist user overrides to the database.
+- **Structured Knowledge Graph** — Implemented backend storage and tools for entity-relationship data.
+  - Added `entities` and `relations` tables to SQLite schema with `MemoryManager` methods.
+  - created `KnowledgeGraphTool` for the agent to `upsert_entity`, `add_relation`, and `find_related`.
+- **Database Tool** — Implemented direct SQL access tool with safety features.
+  - Actions: `connect`, `query`, `schema`, `explain`, `list_tables`, `disconnect`.
+  - Read-only by default (`SQLITE_OPEN_READ_ONLY`) unless explicitly initiated with `readonly: false`.
+  - Introspection support via `PRAGMA table_info` and `sqlite_master`.
 - **Heterogeneous Device Awareness** — `DeviceManager` module probes CPU, GPU (CUDA/MPS), and RAM at startup; exposes hardware info to the LLM planner so it can make device-aware decisions
   - `device.info` and `device.refresh` IPC handlers
   - `get_device_info`, `refresh_device_memory` Tauri commands
   - `deviceStore.ts` Zustand store for frontend device info
   - Device capabilities injected into agent planner context (`loop.rs`)
+- **System Health Monitoring** — `SystemTool` for real-time host metrics.
+  - Tracking CPU usage, RAM, Swap, Uptime, and Load Average.
+  - Process listing with resource usage sorting.
+  - Implements backend for Roadmap 13.1 and 5.2.
+- **Live Resource Monitor (Frontend)** — real-time dashboard for CPU, RAM, and GPU utilization (Roadmap 5.2).
+  - Periodic 2-second polling via `spawn_resource_monitor` in Rust core.
+  - GPU metrics bridged from ML sidecar `device.refresh`.
+  - `resourceStore.ts` with 30-snapshot rolling history.
+  - `ResourceMonitor.tsx` with sparkline charts.
 - **Domain Adaptation Support** — implemented utilities for distribution shift and transfer learning
   - `MMDLoss` for Maximum Mean Discrepancy based alignment
   - `GradientReversalLayer` and `DomainDiscriminator` for Adversarial Training (DANN)
@@ -41,7 +61,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `LoadedModel` extended with `device` and `model_size_mb` tracking fields
   - Device-aware model placement via `DeviceManager.best_device_for()`
 - **Client-Side AI** — Integrated Candle ML framework compiled to WebAssembly for in-browser inference.
+- **RAG Tool** — Added support for document ingestion and vector similarity search via `rag` tool (Roadmap 2.2).
+- **Episodic Memory** — Automatic summary generation on task completion for long-session context management (Roadmap 3.2).
+- **Markdown-Based Knowledge Files** — Added a human-readable knowledge base in markdown format with automatic RAG indexing (Roadmap 3.3).
+- **Cross-Session Retrieval** — Extended `RagTool` and `MemoryManager` to support querying multiple sessions (local + global) simultaneously.
 - **Hierarchical Task Decomposition** — Added a hierarchical planner and subtask management system with UI visualization.
+- **Loop Detection (Self-Correction)** — prevents infinite loops by identifying repetitive identical tool calls (Roadmap 1.2).
+  - Tracks hash of `(tool_name, parameters)` across iterations.
+  - Pauses execution and requests user intervention after 3 repeats.
+- **Containerized Execution Sandbox** — support for running shell commands in isolated Docker containers (Roadmap 2.6).
+  - Added `sandbox` and `image` parameters to `ShellTool`.
+  - Automatic host directory mapping and user UID/GID preservation (on Linux).
+- **Adaptive Context Pruning** — token-aware context management for long conversations (Roadmap 1.3/1.5).
+  - Character-based token estimation and sliding window pruning in `MemoryManager`.
+  - Ensures planning stability by keeping context within model limits.
 - **Reflection & Self-Correction Loop** — Implemented error budgeting, reflection in planning, and UI indicators for agent self-evaluation.
 - **Train-Deploy-Use Cycle** — trained models can be deployed as callable tools the agent uses in future iterations
   - `TrainingService.deploy()` loads checkpoint, rebuilds model, registers as `LoadedModel` in the registry

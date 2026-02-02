@@ -40,8 +40,7 @@ pub struct IpcError {
     pub message: String,
 }
 
-/// Progress update from the sidecar.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ProgressUpdate {
     pub request_id: String,
     pub data: serde_json::Value,

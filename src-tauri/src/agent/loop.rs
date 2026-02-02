@@ -2,9 +2,9 @@
 
 use crate::agent::transaction::TransactionManager;
 use crate::ipc::SidecarHandle;
-use crate::memory::MemoryManager;
+use crate::memory::{generate_task_summary, MemoryManager, TaskOutcome};
 use crate::safety::{PermissionEngine, PermissionResult};
-use crate::tools::{ToolCall, ToolRegistry};
+use crate::tools::{ToolCall, ToolContext, ToolRegistry};
 use pi_core::agent_types::{AgentCommand, AgentState, PermissionRequest, StopReason};
 use pi_core::task_manager::TaskManager;
 
@@ -124,6 +124,14 @@ async fn agent_loop(
     let mut consecutive_errors: u32 = 0;
     const MAX_CONSECUTIVE_ERRORS: u32 = 3;
 
+    // Loop detection state
+    let mut last_tool_call: Option<(String, serde_json::Value)> = None;
+    let mut consecutive_loops: u32 = 0;
+    const MAX_CONSECUTIVE_LOOPS: u32 = 3;
+
+    // Tool execution history for episodic memory
+    let mut tool_history: Vec<(String, bool)> = Vec::new();
+
     loop {
         // ── Check cancellation ───────────────────────────────────────
         if cancel_token.is_cancelled() {
@@ -135,7 +143,6 @@ async fn agent_loop(
             return Ok(StopReason::ManualStop);
         }
 
-        // ── Check iteration limit ────────────────────────────────────
         if iteration >= task.max_iterations {
             let _ = state_tx.send(AgentState::Stopped {
                 agent_id: task.agent_id,
@@ -144,6 +151,12 @@ async fn agent_loop(
             });
             return Ok(StopReason::IterationLimit);
         }
+
+        // ── Loop Detection ───────────────────────────────────────────
+        // We track the last executed tool call to detect repetitive actions.
+        // If the same tool with the same parameters is executed 3 times in a row,
+        // we pause and ask the user (or fail the tool).
+        // This is part of Roadmap 11.2 Self-Correction.
 
         // ── Start transaction ──────────────────────────────────────
         resources.transactions.lock().await.start_transaction();
@@ -306,6 +319,43 @@ async fn agent_loop(
 
         // ── 4. Execute each tool call with permission checks ─────────
         for tool_call in &plan.tool_calls {
+            // Check for loops
+            let current_sig = (tool_call.tool_name.clone(), tool_call.parameters.clone());
+            if let Some(last) = &last_tool_call {
+                if last.0 == current_sig.0 && last.1 == current_sig.1 {
+                    consecutive_loops += 1;
+                } else {
+                    consecutive_loops = 0;
+                }
+            }
+            last_tool_call = Some(current_sig);
+
+            if consecutive_loops >= MAX_CONSECUTIVE_LOOPS {
+                info!(tool = %tool_call.tool_name, repeats = consecutive_loops, "Loop detected, pausing for user intervention");
+
+                let _ = state_tx.send(AgentState::Paused {
+                    agent_id: task.agent_id,
+                    task_id: task.id,
+                    question: Some(format!(
+                        "I seem to be stuck in a loop, repeating the same action ('{}') {} times. Should I continue or stop?",
+                        tool_call.tool_name, consecutive_loops
+                    )),
+                    awaiting_permission: None,
+                });
+
+                let answer = wait_for_answer(&mut cmd_rx, &cancel_token).await?;
+                if answer.to_lowercase().contains("stop") || answer.to_lowercase().contains("no") {
+                    let _ = state_tx.send(AgentState::Stopped {
+                        agent_id: task.agent_id,
+                        task_id: task.id,
+                        reason: StopReason::ManualStop,
+                    });
+                    return Ok(StopReason::ManualStop);
+                }
+                // If user says "continue" or "yes", we reset loops and proceed
+                consecutive_loops = 0;
+            }
+
             let permission = resources.permission_engine.lock().await.check(tool_call)?;
 
             match permission {
@@ -330,11 +380,18 @@ async fn agent_loop(
                         wait_for_permission(&mut cmd_rx, &cancel_token, req.id).await?;
 
                     if remember {
+                        let pattern = tool_call.pattern_key();
                         resources
                             .permission_engine
                             .lock()
                             .await
-                            .add_user_override(&tool_call.pattern_key(), approved);
+                            .add_user_override(&pattern, approved);
+
+                        // Persist to DB
+                        if let Err(e) = resources.memory.cache_permission(&pattern, approved, None)
+                        {
+                            warn!(error = %e, "Failed to persist permission override");
+                        }
                     }
 
                     let _ = state_tx.send(AgentState::Running {
@@ -429,16 +486,18 @@ async fn agent_loop(
                 .clone();
             // Execute tool with timing
             let exec_start = std::time::Instant::now();
-            let context = crate::tools::ToolContext {
+            let context = ToolContext {
                 transactions: Some(resources.transactions.clone()),
+                memory: Some(resources.memory.clone()),
+                session_id: task.session_id,
             };
             let result = tool.execute(tool_call.parameters.clone(), context).await;
             let duration_ms = exec_start.elapsed().as_millis() as u64;
 
-            // Handle result and error budget
             let _result_str = match result {
                 Ok(res) => {
                     consecutive_errors = 0; // Reset on success
+                    tool_history.push((tool_call.tool_name.clone(), true));
                     resources
                         .memory
                         .store_tool_result(&task.id, tool_call, &res, Some(duration_ms))
@@ -447,6 +506,7 @@ async fn agent_loop(
                 }
                 Err(e) => {
                     consecutive_errors += 1;
+                    tool_history.push((tool_call.tool_name.clone(), false));
                     warn!(error = %e, consecutive_errors, "Tool execution failed");
                     let error_msg = format!("Tool failed: {}", e);
 
@@ -488,6 +548,17 @@ async fn agent_loop(
         // ── 5. Check completion ──────────────────────────────────────
         if plan.is_complete {
             info!(task_id = %task.id, iterations = iteration, "Task completed");
+
+            // Generate and store episode summary
+            let summary =
+                generate_task_summary(&task.description, &tool_history, TaskOutcome::Completed);
+            if let Err(e) = resources
+                .memory
+                .store_episode_summary(&task.id, &summary, None)
+            {
+                warn!(error = %e, "Failed to store episode summary");
+            }
+
             let _ = state_tx.send(AgentState::Stopped {
                 agent_id: task.agent_id,
                 task_id: task.id,

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export interface TrainingRun {
   run_id: string;
@@ -7,6 +8,11 @@ export interface TrainingRun {
   started_at?: string;
   completed_at?: string;
   metrics?: Record<string, number>;
+  history?: Array<{
+    epoch?: number;
+    batch?: number;
+    metrics: Record<string, number>;
+  }>;
   error?: string;
   model_path?: string;
   tool_name?: string;
@@ -29,6 +35,7 @@ interface TrainingState {
     toolName: string,
     device?: string,
   ) => Promise<void>;
+  initProgressSocket: () => Promise<void>;
 }
 
 export const useTrainingStore = create<TrainingState>((set, get) => ({
@@ -92,5 +99,28 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
       set({ error: e.toString(), isLoading: false });
       throw e;
     }
+  },
+
+  initProgressSocket: async () => {
+    await listen<any>("sidecar-progress", (event) => {
+      const { run_id, metrics, epoch, batch } = event.payload.data;
+      if (!run_id) return;
+
+      set((state) => {
+        const runs = [...state.runs];
+        const runIndex = runs.findIndex((r) => r.run_id === run_id);
+        if (runIndex === -1) return state;
+
+        const run = { ...runs[runIndex] };
+        run.metrics = metrics;
+
+        // Append to history
+        const newHistoryItem = { epoch, batch, metrics };
+        run.history = [...(run.history || []), newHistoryItem];
+
+        runs[runIndex] = run;
+        return { runs };
+      });
+    });
   },
 }));

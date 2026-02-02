@@ -24,6 +24,7 @@ This roadmap outlines planned features and enhancements across the Pi-Assistant 
 After each tool execution, add an explicit reflection step where the agent evaluates whether the result matches expectations. If the result diverges (e.g., a command fails, output is unexpected), the agent should revise its plan before continuing rather than blindly proceeding to the next tool call.
 
 - Compare expected vs. actual tool output using lightweight classifier
+- **Loop Detection**: Identifies and pauses repetitive identical tool calls (e.g., 3x same params) to prevent infinite loops.
 - Maintain a per-task error budget: after N consecutive failures, pause and ask the user
 - Log reflection reasoning alongside tool results for transparency
 
@@ -75,14 +76,13 @@ Expand the existing PyTorch Lightning training tool into a full workflow for tra
 - Model versioning: the agent can retrain and compare metrics across versions
 - Active learning: the agent identifies low-confidence predictions and asks the user for labels
 
-### 2.2 Retrieval-Augmented Generation (RAG) Tool
+### 2.2 Retrieval-Augmented Generation (RAG) Tool [IMPLEMENTED]
 
-A dedicated tool that lets the agent ingest documents (PDFs, markdown, code repositories, web pages) into a searchable vector store and query them during planning.
+Ingest local documents into a searchable vector store and query them during planning.
 
-- Chunking strategies: fixed-size, sentence-boundary, AST-aware (for code)
-- Hybrid retrieval: combine vector similarity with BM25 keyword matching
-- Source attribution: every retrieved chunk links back to its origin document and page/line
-- Incremental indexing: add new documents without re-indexing the entire corpus
+- **Ingestion**: `rag` tool with `ingest` action to chunk and embed documents (fixed-size with overlap).
+- **Query**: `rag` tool with `query` action to retrieve top-k similar chunks using cosine similarity.
+- **Persistence**: Chunks and embeddings stored in SQLite `rag_chunks` table with linear similarity search.
 
 ### 2.3 Database Tool
 
@@ -97,12 +97,13 @@ Direct SQL access to user-specified databases (SQLite, PostgreSQL, MySQL) for da
 
 A generic HTTP client tool that the agent can use to interact with external APIs.
 
-- OpenAPI/Swagger spec ingestion: [IMPLEMENTED] given a spec URL, the agent learns all available endpoints
-- Authentication management: OAuth2 flows, API key storage (encrypted in permission-gated keyring)
-- Rate limiting awareness: the agent respects `Retry-After` headers and backs off appropriately
-- Response caching: avoid redundant API calls within the same task
+### 2.3 Database Tool [IMPLEMENTED]
 
-### 2.5 Drawing & Diagram Tool
+Direct SQL access to user-specified SQLite databases for debugging, data exploration, and ad-hoc queries.
+
+- Read-only mode by default; writes require explicit permission approval
+- Schema introspection: the agent can discover tables, columns, and relationships
+- Query explanation
 
 Generate and render diagrams (flowcharts, sequence diagrams, architecture diagrams, ER diagrams) using Mermaid or D2 syntax, rendered live in the Canvas.
 
@@ -110,20 +111,26 @@ Generate and render diagrams (flowcharts, sequence diagrams, architecture diagra
 - Diagrams stored as versioned artifacts alongside task history
 - User can request modifications ("add a cache layer between the API and database")
 
-### 2.6 Containerized Execution Environment
+### 1.5 Adaptive Context Management [IMPLEMENTED]
+
+Token-aware context pruning to prevent window overflow in long conversations.
+
+- **Token Estimation**: Character-based heuristic (char count / 4) for lightweight pruning before serializing to LLM.
+- **Window Fitting**: Automatically drops oldest relevant context when total size exceeds 4000 tokens (16,000 chars), ensuring planning stability.
+
+### 2.6 Containerized Execution Environment [IMPLEMENTED]
 
 Run agent tool calls inside isolated Docker containers for safety and reproducibility.
 
-- Per-task container with configurable base image
-- Filesystem snapshot before/after tool execution for diff visualization
-- Network isolation modes: none, host-only, full
-- Resource limits (CPU, memory, disk) configurable per task
+- **Sandbox Support**: `ShellTool` now supports a `sandbox` parameter to wrap commands in `docker run`.
+- **Host Mapping**: Automatically maps the host working directory to `/workspace` and preserves user UID/GID on Linux.
+- **Cleanup**: Uses `--rm` for automatic container cleanup after execution.
 
 ---
 
 ## 3. Memory & Knowledge
 
-### 3.1 Structured Knowledge Graph
+### 3.1 Structured Knowledge Graph [PARTIAL]
 
 Augment the current flat embedding store with a knowledge graph that captures relationships between entities the agent has encountered.
 
@@ -133,24 +140,22 @@ Augment the current flat embedding store with a knowledge graph that captures re
 - Graph queries inform the planner: "what files are related to the authentication module?"
 - Visualization: interactive graph explorer in the UI (force-directed layout)
 
-### 3.2 Episodic Memory with Summarization
+### 3.2 Episodic Memory with Summarization [IMPLEMENTED]
 
-Long-running sessions generate large volumes of messages and tool results. Introduce an episodic memory layer that summarizes completed task episodes into concise narrative summaries.
+Long-running sessions generate large volumes of messages and tool results. Episodic memory provides an abstraction layer that summarizes completed task episodes.
 
-- After a task completes, generate a summary: what was asked, what was done, what was the outcome
-- Summaries are embedded and searchable alongside raw messages
-- Configurable retention policy: keep raw data for N days, keep summaries indefinitely
-- Summary quality improves over time via user feedback (thumbs up/down on summary accuracy)
+- **Summary Generation**: Template-based narrative summaries capturing task description, tool usage, and outcome.
+- **Persistence**: Summaries stored in `episode_summaries` SQLite table with optional embeddings for vector search.
+- **Agent Integration**: Summaries generated automatically on task completion and stored for future retrieval.
 
-### 3.3 Markdown-Based Knowledge Files
+### 3.3 Markdown-Based Knowledge Files [IMPLEMENTED]
 
 Allow the agent to maintain a set of markdown files as a persistent, human-readable knowledge base.
 
-- `~/.pi-assistant/knowledge/` directory organized by topic
-- Agent creates and updates files as it learns (e.g., `projects/my-app.md`, `preferences/coding-style.md`)
-- Files are indexed for vector search alongside database entries
-- User can edit files directly; changes are picked up on next retrieval
-- Agent references specific sections when explaining its reasoning: "Based on your coding preferences (see preferences/coding-style.md)..."
+- **`knowledge` Tool**: Actionable tool to `upsert`, `read`, `list`, and `index` markdown knowledge files.
+- **Global Storage**: Knowledge files are stored in `~/.pi-assistant/knowledge/` and indexed using a global session ID (nil UUID).
+- **Cross-Session RAG**: `RagTool` automatically searches both the current session's local knowledge and the global markdown knowledge store.
+- **Transparency**: The agent references specific files when reasoning (e.g., "According to your preferences in `coding-style.md`...").
 
 ### 3.4 Conversation Branching & Replay
 
@@ -174,7 +179,7 @@ Use patterns from past sessions to improve future performance.
 
 ## 4. Human-Agent Interaction
 
-### 4.1 Rich Permission Workflows
+### 4.1 Rich Permission Workflows [PARTIAL]
 
 Extend the current 3-tier permission system with more granular and context-aware controls.
 
@@ -243,15 +248,15 @@ A horizontal timeline view showing every action the agent has taken during a tas
 - Filter by tool type, status, or time range
 - Parallel tool calls shown as vertically stacked nodes at the same time position
 
-### 5.2 Live Resource Monitor
+### 5.2 Live Resource Monitor [IMPLEMENTED]
 
 Real-time dashboard showing system resource usage during agent execution.
 
-- CPU, memory, disk I/O, network usage
-- Per-process breakdown (Rust core, Python sidecar, headless Chrome, child processes)
-- GPU utilization during ML training (CUDA/ROCm metrics from PyTorch)
-- Historical chart with markers for each agent action
-- Alerts when resources approach configured thresholds
+- [x] CPU, memory, disk I/O, network usage
+- [x] Per-process breakdown (Rust core, Python sidecar, headless Chrome, child processes)
+- [x] GPU utilization during ML training (CUDA/ROCm metrics from PyTorch)
+- [ ] Historical chart with markers for each agent action
+- [ ] Alerts when resources approach configured thresholds
 
 ### 5.3 Memory Visualization
 
@@ -286,9 +291,9 @@ Dedicated view for monitoring ML model training in real time.
 
 - [x] List of training runs with status and metrics
 - [x] Model deployment interface
-- [ ] Loss curves (training and validation) updating live
-- [ ] Metric charts (accuracy, F1, BLEU, etc.) per epoch
-- [ ] Learning rate schedule visualization
+- [x] Loss curves (training and validation) updating live
+- [x] Metric charts (accuracy, F1, BLEU, etc.) per epoch
+- [x] Learning rate schedule visualization
 - GPU memory and utilization graphs
 - Checkpoint timeline with performance annotations
 - Early stopping indicator with configurable patience
@@ -725,10 +730,11 @@ Specialized visual understanding for software development contexts.
 
 ## 13. Environment Awareness & Adaptation
 
-### 13.1 System Health Monitoring
+### 13.1 System Health Monitoring [IMPLEMENTED]
 
 The agent continuously monitors the host system and adapts its behavior accordingly.
 
+- **Status & Process Monitoring**: `SystemTool` provides real-time CPU, Memory, Swap, Uptime, and Process list.
 - **Thermal awareness**: on laptops and SBCs (Raspberry Pi, Jetson), read thermal sensors and throttle agent activity (reduce batch sizes, pause training, migrate to CPU) before thermal throttling kicks in
 - **Battery awareness**: on battery-powered devices, reduce GPU usage and defer non-urgent tasks until plugged in
 - **Disk space monitoring**: before writing large files (model checkpoints, datasets), check available disk space and warn the user if space is low
