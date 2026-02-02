@@ -39,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - User-configurable limits for Max Tokens and Max Cost in Settings.
   - `CostDashboard` component for real-time monitoring.
   - Backend integration in `AgentCommand::Start` to enforce budgets.
+- **Multi-Agent Support** — Refactored backend and frontend to support multiple concurrent agents.
+  - Backend `AgentCoordinator` manages multiple `AgentLoop` instances.
+  - `agent_id` tracking in `AgentState` and `AgentCommand`.
+  - Frontend `AgentStore` tracks collection of agents.
+  - `AgentSelector` UI component for switching agent contexts.
+- **Training Dashboard** — Initial UI for managing ML training runs (Roadmap 5.6).
+  - List historical and active training runs.
+  - Start new training runs with JSON config.
+  - Stop running jobs.
+  - Deploy trained models to `DeviceManager`.
 - Project architecture design and documentation
 - File structure for Rust (Tauri v2), React/TypeScript, Python sidecar, and Android client
 - Agent loop design with state machine (Idle/Running/Paused/Stopped)

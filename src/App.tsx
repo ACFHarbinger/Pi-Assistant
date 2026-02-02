@@ -8,6 +8,7 @@ import { HatchingExperience } from "./components/HatchingExperience.tsx";
 import { VoicePanel } from "./components/VoicePanel";
 import { Canvas } from "./components/Canvas";
 import { TaskTree } from "./components/TaskTree";
+import { TrainingDashboard } from "./components/TrainingDashboard";
 
 import Settings from "./components/Settings";
 import { useState, useEffect } from "react";
@@ -17,6 +18,7 @@ function App() {
   const { agents, activeAgentId, setupListeners } = useAgentStore();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
+  const [isTrainingOpen, setIsTrainingOpen] = useState(false);
   const [isHatched, setIsHatched] = useState<boolean | null>(null);
 
   // Derive active state
@@ -166,6 +168,11 @@ function App() {
 
       {/* Live Canvas */}
       <Canvas isOpen={isCanvasOpen} onClose={() => setIsCanvasOpen(false)} />
+
+      {/* Training Dashboard */}
+      {isTrainingOpen && (
+        <TrainingDashboard onClose={() => setIsTrainingOpen(false)} />
+      )}
 
       {/* Settings Dialog */}
       <Settings

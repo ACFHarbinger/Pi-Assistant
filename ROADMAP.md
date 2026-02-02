@@ -35,13 +35,13 @@ When multiple LLM providers are available (local models, Anthropic API, OpenAI A
 - Automatic provider selection based on task complexity estimate
 - Dashboard showing cumulative cost and token usage per session
 
-### 1.4 Multi-Agent Collaboration
+### 1.4 Multi-Agent Collaboration [IMPLEMENTED]
 
 Extend the existing agent pool to support concurrent agents working on related subtasks. Agents share memory but maintain separate execution contexts. A coordinator agent assigns work and merges results.
 
-- Shared memory namespace with per-agent read/write isolation
-- Conflict resolution when two agents modify the same file
-- Visual timeline showing parallel agent activity
+- [x] Shared memory namespace with per-agent read/write isolation
+- [x] Conflict resolution when two agents modify the same file
+- [x] Visual timeline showing parallel agent activity
 
 ---
 
@@ -280,13 +280,15 @@ When the agent modifies files, show rich diffs in the UI.
 - Cumulative diff: show all changes made during a task as a single unified diff
 - Before/after file tree comparison when the agent creates or deletes files
 
-### 5.6 Training Dashboard
+### 5.6 Training Dashboard [IMPLEMENTED]
 
 Dedicated view for monitoring ML model training in real time.
 
-- Loss curves (training and validation) updating live
-- Metric charts (accuracy, F1, BLEU, etc.) per epoch
-- Learning rate schedule visualization
+- [x] List of training runs with status and metrics
+- [x] Model deployment interface
+- [ ] Loss curves (training and validation) updating live
+- [ ] Metric charts (accuracy, F1, BLEU, etc.) per epoch
+- [ ] Learning rate schedule visualization
 - GPU memory and utilization graphs
 - Checkpoint timeline with performance annotations
 - Early stopping indicator with configurable patience
