@@ -1,9 +1,12 @@
 # Pi-Assistant
 
-[![CI](https://github.com/ACFHarbinger/Pi-Assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/ACFHarbinger/Pi-Assistant/actions/workflows/ci.yml)
-[![codecov (rust)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant/branch/main/graph/badge.svg?flag=rust)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant)
-[![codecov (python)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant/branch/main/graph/badge.svg?flag=python)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant)
-[![codecov (typescript)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant/branch/main/graph/badge.svg?flag=typescript)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg?style=flat-square)](https://github.com/ACFHarbinger/Pi-Assistant/releases)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-green.svg?style=flat-square)](LICENSE)
+[![CI](https://github.com/ACFHarbinger/Pi-Assistant/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/ACFHarbinger/Pi-Assistant/actions/workflows/ci.yml)
+[![codecov (rust)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant/branch/main/graph/badge.svg?flag=rust&style=flat-square)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant)
+[![codecov (python)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant/branch/main/graph/badge.svg?flag=python&style=flat-square)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant)
+[![codecov (typescript)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant/branch/main/graph/badge.svg?flag=typescript&style=flat-square)](https://codecov.io/gh/ACFHarbinger/Pi-Assistant)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
 
 **Languages**
 
@@ -145,10 +148,10 @@ Pi-Assistant is a multi-runtime system where a Rust core orchestrates an AI agen
                                  └──────────┬──────────────────┘
                                             │
                                  ┌──────────▼──────────────────┐
-                                 │  Python Sidecar              │
-                                 │  PyTorch Lightning            │
-                                 │  sentence-transformers        │
-                                 └──────────────────────────────┘
+                                 │  Python Sidecar             │
+                                 │  PyTorch Lightning          │
+                                 │  sentence-transformers      │
+                                 └─────────────────────────────┘
 ```
 
 ## Features
