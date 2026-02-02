@@ -22,7 +22,7 @@
     "@tauri-apps/plugin-shell": "^2.2.0",
     "lucide-react": "^0.563.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^19.2.4",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
@@ -31,7 +31,7 @@
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.1.0",
     "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^4.0.18",
     "autoprefixer": "^10.4.20",
