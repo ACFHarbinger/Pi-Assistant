@@ -1,5 +1,11 @@
 # Agent System
 
+[![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Tauri](https://img.shields.io/badge/tauri-%2324C8DB.svg?style=for-the-badge&logo=tauri&logoColor=%23262626)](https://tauri.app/)
+[![Tokio](https://img.shields.io/badge/Tokio-%23000000.svg?style=for-the-badge&logo=Tokio&logoColor=white)](https://tokio.rs/)
+[![Python](https://img.shields.io/badge/python-3.11+-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org/)
+[![SQLite](https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+
 This document describes how the Pi-Assistant agent works: its execution loop, tool system, planning strategy, and memory integration.
 
 ---
