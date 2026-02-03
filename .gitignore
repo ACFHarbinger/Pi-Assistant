@@ -432,3 +432,6 @@ assets/secrets/*.json
 
 # Python
 *.egg-info/
+
+# Test Coverage
+coverage/
