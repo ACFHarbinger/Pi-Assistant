@@ -33,6 +33,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Actions: `connect`, `query`, `schema`, `explain`, `list_tables`, `disconnect`.
   - Read-only by default (`SQLITE_OPEN_READ_ONLY`) unless explicitly initiated with `readonly: false`.
   - Introspection support via `PRAGMA table_info` and `sqlite_master`.
+- **API Integration Tool** — Generic HTTP client tool for interacting with external APIs (Roadmap 2.4).
+  - Supports GET, POST, PUT, PATCH, DELETE with configurable headers, body, and auth.
+  - Authentication modes: Bearer token, Basic auth, API key (custom header).
+  - Response caching with SHA-256 keyed entries and configurable TTL.
+  - Rate limiting: respects `Retry-After` headers on 429 responses with per-domain cooldown.
+  - OpenAPI spec ingestion for dynamic API structure discovery.
+- **Drawing & Diagram Tool** — Mermaid diagram rendering via the Canvas system (Roadmap 2.5).
+  - `render` action wraps Mermaid code in HTML with Mermaid.js CDN and dark theme, emits via `canvas-push` event.
+  - `export` action extracts SVG/PNG from rendered diagrams via `canvas-eval` event.
+  - Uses shared `CanvasStateManager` for diagram persistence and versioning.
+- **Execution Timeline** — Visual timeline of all agent tool executions (Roadmap 5.1).
+  - Backend: `duration_ms` column added to `tool_executions` table via idempotent schema migration.
+  - Backend: `get_execution_timeline` Tauri command returns chronological tool execution data per task.
+  - Agent loop instrumented with `std::time::Instant` timing around tool execution.
+  - Frontend: `ExecutionTimeline.tsx` modal with color-coded tool entries, expandable details, and filters.
+  - Auto-refreshes every 3 seconds while open.
 - **Heterogeneous Device Awareness** — `DeviceManager` module probes CPU, GPU (CUDA/MPS), and RAM at startup; exposes hardware info to the LLM planner so it can make device-aware decisions
   - `device.info` and `device.refresh` IPC handlers
   - `get_device_info`, `refresh_device_memory` Tauri commands

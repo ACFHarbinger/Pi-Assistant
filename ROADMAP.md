@@ -84,32 +84,32 @@ Ingest local documents into a searchable vector store and query them during plan
 - **Query**: `rag` tool with `query` action to retrieve top-k similar chunks using cosine similarity.
 - **Persistence**: Chunks and embeddings stored in SQLite `rag_chunks` table with linear similarity search.
 
-### 2.3 Database Tool
-
-Direct SQL access to user-specified databases (SQLite, PostgreSQL, MySQL) for data exploration, querying, and modification.
-
-- Read-only mode by default; writes require explicit permission approval
-- Schema introspection: the agent can discover tables, columns, and relationships
-- Query explanation: the agent can run `EXPLAIN` and interpret query plans
-- Result visualization: tables rendered in the UI, with optional chart generation
-
-### 2.4 API Integration Tool
-
-A generic HTTP client tool that the agent can use to interact with external APIs.
-
 ### 2.3 Database Tool [IMPLEMENTED]
 
 Direct SQL access to user-specified SQLite databases for debugging, data exploration, and ad-hoc queries.
 
-- Read-only mode by default; writes require explicit permission approval
-- Schema introspection: the agent can discover tables, columns, and relationships
-- Query explanation
+- Read-only mode by default (`SQLITE_OPEN_READ_ONLY`); writes require explicit permission approval
+- Schema introspection: the agent can discover tables, columns, and relationships via `PRAGMA table_info`
+- Query explanation: the agent can run `EXPLAIN QUERY PLAN` and interpret results
+- Actions: `connect`, `query`, `schema`, `explain`, `list_tables`, `disconnect`
 
-Generate and render diagrams (flowcharts, sequence diagrams, architecture diagrams, ER diagrams) using Mermaid or D2 syntax, rendered live in the Canvas.
+### 2.4 API Integration Tool [IMPLEMENTED]
+
+A generic HTTP client tool that the agent can use to interact with external APIs.
+
+- Supports GET, POST, PUT, PATCH, DELETE methods with configurable headers and body
+- Authentication: Bearer token, Basic auth, and API key (custom header)
+- Response caching with SHA-256 keyed entries and configurable TTL
+- Rate limiting: respects `Retry-After` headers on 429 responses with per-domain cooldown
+- OpenAPI spec ingestion: parses JSON/YAML specs to learn API structures dynamically
+
+### 2.5 Drawing & Diagram Tool [IMPLEMENTED]
+
+Generate and render diagrams (flowcharts, sequence diagrams, architecture diagrams, ER diagrams) using Mermaid syntax, rendered live in the Canvas.
 
 - Agent can produce diagrams as part of its reasoning (e.g., "here's the architecture I'm proposing")
-- Diagrams stored as versioned artifacts alongside task history
-- User can request modifications ("add a cache layer between the API and database")
+- Mermaid.js rendering with dark theme support via Canvas event system
+- SVG/PNG export support via `canvas-eval` events
 
 ### 1.5 Adaptive Context Management [IMPLEMENTED]
 
@@ -238,15 +238,16 @@ The agent can generate step-by-step walkthroughs of its actions for educational 
 
 ## 5. Visualization & Observability
 
-### 5.1 Execution Timeline
+### 5.1 Execution Timeline [IMPLEMENTED]
 
-A horizontal timeline view showing every action the agent has taken during a task.
+A vertical timeline view showing every action the agent has taken during a task.
 
-- Each tool call is a node on the timeline with duration, status (success/failure), and a preview of the result
-- Nodes are color-coded by tool type (shell=blue, browser=green, code=yellow, ML=purple)
-- Click a node to expand full input/output details
-- Filter by tool type, status, or time range
-- Parallel tool calls shown as vertically stacked nodes at the same time position
+- Each tool call displayed with duration, status (success/failure), and a preview of the result
+- Color-coded by tool type (shell=blue, browser=green, code=yellow, train=purple, canvas=pink, database=cyan, api=orange, diagram=indigo)
+- Click a node to expand full input/output details (parameters JSON, output, error)
+- Filter by tool type and success/fail status
+- Auto-refreshes every 3 seconds while open
+- Duration tracking instrumented in the agent loop (`store_tool_result` with `duration_ms`)
 
 ### 5.2 Live Resource Monitor [IMPLEMENTED]
 
